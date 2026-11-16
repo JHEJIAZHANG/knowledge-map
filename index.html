@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>知识地图</title>
+  <meta name="description" content="依照学习顺序整理的笔记，用白话解释，搭配逐步动画演示。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    // 在画面出现前套用主题，避免闪烁
+    try {
+      var saved = localStorage.getItem('km-theme');
+      if (saved) document.documentElement.dataset.theme = saved;
+      if (localStorage.getItem('km-side') !== 'closed' && matchMedia('(min-width: 1180px)').matches) document.documentElement.classList.add('side-open');
+    } catch (e) {}
+    window.KnowledgeMap = {
+      chapters: [], topics: [],
+      add: function (c) { this.chapters.push(c); },
+      topic: function (t) { this.topics.push(t); },
+      extras: [],
+      deepen: function (id, d) { this.extras.push([id, d]); }
+    };
+  </script>
+</head>
+<body>
+  <div class="veil" aria-hidden="true"><i></i><i></i></div>
+  <nav class="island glass lit" id="island" aria-label="导览"></nav>
+  <main id="view"></main>
+
+  <script src="js/ui.js"></script>
+  <script src="js/terminal.js"></script>
+  <script src="js/anatomy.js"></script>
+  <script src="js/movie.js"></script>
+  <script src="js/films.js"></script>
+  <script src="js/films-py.js"></script>
+  <script src="js/py.js"></script>
+  <script src="js/run.js"></script>
+
+  <!-- 内容格式见 content/topics.js。同一主题内，这里的顺序就是学习顺序。 -->
+  <script src="content/topics.js"></script>
+  <script src="content/linux/2026-11-09-first-commands.js"></script>
+  <script src="content/linux/2026-11-09-whoami-challenge.js"></script>
+  <script src="content/linux/2026-11-09-navigate.js"></script>
+  <script src="content/linux/2026-11-09-create-and-list.js"></script>
+  <script src="content/linux/2026-11-09-copy-and-move.js"></script>
+  <script src="content/linux/2026-11-09-delete.js"></script>
+  <script src="content/linux/2026-11-09-read-and-compare.js"></script>
+  <script src="content/linux/2026-11-09-manuscript-challenge.js"></script>
+  <script src="content/linux/2026-11-10-owner-chown.js"></script>
+  <script src="content/linux/2026-11-10-chmod.js"></script>
+  <script src="content/linux/2026-11-11-ownership-challenge.js"></script>
+  <script src="content/linux/2026-11-14-user-accounts.js"></script>
+  <script src="content/linux/2026-11-15-system-info.js"></script>
+  <script src="content/linux/2026-11-15-organize-project.js"></script>
+  <script src="content/linux/2026-11-15-troubleshoot.js"></script>
+  <script src="content/linux/2026-11-16-hello-script.js"></script>
+  <script src="content/linux/2026-11-16-shell-variables.js"></script>
+  <script src="content/linux/2026-11-16-quoting-variables.js"></script>
+  <!-- 加深印象的补充内容：翻车现场、幕后、情境故事、一张图总结、大楼比喻 -->
+  <script src="content/linux/deepen.js"></script>
+  <script src="content/python/2026-11-16-python-repl.js"></script>
+  <script src="content/python/deepen.js"></script>
+
+  <script src="js/store.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/sidebar.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/extras.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
