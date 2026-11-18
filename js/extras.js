@@ -1,10 +1,10 @@
-// 加深印象用的内容：翻车现场、幕后视角、情境故事、一张图总结，以及贯穿全站的大楼比喻
+// 加深印象用的内容：翻车现场、幕后视角、换个写法、情境故事、一张图总结
+// 翻车现场、幕后、换个写法收在每节最后的「补充」分段标签里，点了才展开
 // 数据写在 content/主题/deepen.js，格式说明见 content/topics.js
 (function () {
   const KM = window.KnowledgeMap;
   const { chapters } = KM;
-  const { h, rich, icon, tag, reduced, ICONS } = KM.ui;
-  const { chapterUrl, groupOf, topicOf } = KM.store;
+  const { h, rich, icon, tag, reduced } = KM.ui;
 
   const cell = (b, fallback, cls, ...kids) =>
     h('div', { class: `cell reveal lit ${cls}`, style: `--span:${b.span || fallback}` }, ...kids);
@@ -103,8 +103,7 @@
           h('div', { class: 'poster-nodes' }, lane.nodes.map((n) =>
             h('div', { class: 'poster-node' },
               h('code', {}, n.cmd),
-              h('span', { class: 'poster-does', html: rich(n.does) }),
-              n.as ? h('span', { class: 'poster-as', html: icon('building') }, n.as) : null)))))),
+              h('span', { class: 'poster-does', html: rich(n.does) }))))))),
       b.line ? h('p', { class: 'poster-line', html: rich(b.line) }) : null);
   }
 
@@ -121,157 +120,78 @@
             h('li', {}, h('code', {}, cmd), note ? h('span', { html: rich(note) }) : null)))))));
   }
 
-  KM.blocks = { oops, behind, story, poster, alt };
-
-  // 大楼：每个分类各占一间，两间一层，一楼在下 ------------------------------------------
-  const zones = KM.zones || [];
-  const zoneOf = (c) => zones.find((z) => z.id === c.group);
-  const NS = 'http://www.w3.org/2000/svg';
-  const S = (tagName, attrs, ...kids) => {
-    const el = document.createElementNS(NS, tagName);
-    for (const [k, v] of Object.entries(attrs || {})) if (v != null) el.setAttribute(k, v);
-    el.append(...kids.filter((x) => x != null));
-    return el;
+  // 每节最后的补充：分段标签，一次只展开一张，再点一次收起 ----------------------------
+  const KINDS = {
+    oops: ['翻车现场', 'flame', oops],
+    behind: ['幕后', 'eye', behind],
+    alt: ['换个写法', 'sparkle', alt],
   };
-  const glyph = (name, x, y, size) => {
-    const g = S('svg', { class: 'bld-i', x, y, width: size, height: size, viewBox: '0 0 24 24' });
-    g.innerHTML = ICONS[name] || '';
-    return g;
-  };
-
-  // on：亮起的房间；pick：点房间时调用；mini：缩略图，不放文本
-  function building({ on, pick, mini }) {
-    // 三层的高度是基准，多一层就往下加 108
-    const extra = (Math.max(3, Math.ceil(zones.length / 2)) - 3) * 108;
-    const svg = S('svg', { class: `bld${mini ? ' mini' : ''}`, viewBox: `0 0 720 ${452 + extra}`, role: pick ? 'group' : 'img', 'aria-label': '大楼剖面图' });
-    svg.append(
-      S('path', { class: 'bld-roof', d: 'M52 96 L340 22 Q360 17 380 22 L668 96 Z' }),
-      S('rect', { class: 'bld-body', x: 78, y: 88, width: 564, height: 344 + extra, rx: 20 }),
-      S('path', { class: 'bld-ground', d: `M30 ${440 + extra} H690` }));
-    zones.forEach((z, i) => {
-      const col = i % 2;
-      const floor = Math.floor(i / 2); // 0 是一楼
-      const x = 94 + col * 270;
-      const y = 320 + extra - floor * 108;
-      const g = S('g', { class: `room${z.id === on ? ' on' : ''}`, transform: `translate(${x} ${y})` });
-      g.append(S('rect', { width: 262, height: 96, rx: 16 }));
-      if (mini) {
-        g.append(glyph(z.icon, 107, 24, 48));
-      } else {
-        const name = S('text', { class: 'room-name', x: 66, y: 44 });
-        name.textContent = z.name;
-        const sub = S('text', { class: 'room-sub', x: 66, y: 70 });
-        sub.textContent = z.group;
-        const fl = S('text', { class: 'room-floor', x: 244, y: 80, 'text-anchor': 'end' });
-        fl.textContent = `${floor + 1}F`;
-        g.append(glyph(z.icon, 20, 30, 34), name, sub, fl);
-      }
-      if (pick) {
-        g.setAttribute('role', 'button');
-        g.setAttribute('tabindex', '0');
-        g.setAttribute('aria-label', `${z.name}：${z.group}`);
-        g.setAttribute('aria-pressed', String(z.id === on));
-        g.addEventListener('click', () => pick(z.id));
-        g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(z.id); } });
-      }
-      svg.append(g);
+  function more(list) {
+    const panel = h('div', { class: 'more-panel', hidden: '' });
+    const made = new Map();
+    let open = -1;
+    const tabs = list.map((b, i) => {
+      const [label, ic] = KINDS[b.type];
+      const same = list.filter((x) => x.type === b.type);
+      const n = same.length > 1 ? ` ${same.indexOf(b) + 1}` : '';
+      return h('button', {
+        class: 'more-tab elastic', type: 'button', 'aria-expanded': 'false', title: (b.title || '').replace(/\*\*|`/g, ''),
+        html: `${icon(ic)}<span>${label}${n}</span>`,
+        onclick: () => pick(i),
+      });
     });
-    return svg;
-  }
-
-  const pairs = (list) => h('div', { class: 'pairs' }, (list || []).map(([a, b]) =>
-    h('span', { class: 'pair' }, h('code', {}, a), h('i', {}, '＝'), h('b', {}, b))));
-
-  // 文章开头：这篇发生在大楼的哪里
-  function strip(c) {
-    const z = zoneOf(c);
-    if (!z) return null;
-    return h('a', { class: 'world-strip lit elastic reveal', href: `#/world/${z.id}`, draggable: 'false' },
-      building({ on: z.id, mini: true }),
-      h('div', { class: 'world-strip-body' },
-        h('small', {}, '这篇发生在大楼的'),
-        h('b', {}, z.name),
-        h('span', { class: 'world-strip-line', html: rich(z.line) }),
-        pairs(c.world && c.world.length ? c.world : z.pairs.slice(0, 3))),
-      h('span', { class: 'path-go', html: icon('arrow') }));
-  }
-
-  // 一个分类里出现过的命令（去掉 sudo，只留第一个字）
-  function commandsIn(list) {
-    const seen = new Set();
-    for (const c of list) for (const s of c.sections) for (const b of s.blocks) {
-      let py = false;
-      for (const l of [...(b.lines || []), ...(b.commands || [])]) {
-        if (!l || !l.cmd) continue;
-        // Python 交互模式里打的是代码，不是命令
-        if (b.lang === 'py' || (l.prompt || b.prompt) === '>>>' || py) { if (/^(exit|quit)\(\)$/.test(l.cmd)) py = false; continue; }
-        if (/^python3?$/.test(l.cmd)) py = b.type === 'run';
-        const w = l.cmd.replace(/^sudo\s+/, '').split(/\s+/)[0];
-        if (/^[a-z][a-z0-9]*$/.test(w)) seen.add(w);
+    function pick(i) {
+      if (open >= 0) { tabs[open].classList.remove('on'); tabs[open].setAttribute('aria-expanded', 'false'); }
+      open = open === i ? -1 : i;
+      panel.hidden = open < 0;
+      if (open < 0) return;
+      tabs[open].classList.add('on');
+      tabs[open].setAttribute('aria-expanded', 'true');
+      if (!made.has(open)) {
+        const el = KINDS[list[open].type][2](list[open]);
+        el.classList.add('in');
+        made.set(open, el);
       }
+      panel.replaceChildren(made.get(open));
     }
-    return [...seen];
+    return h('div', { class: 'cell more reveal lit', style: '--span:12' },
+      h('div', { class: 'more-bar' },
+        h('span', { class: 'more-label', html: `${icon('bulb')}<span>补充・想多看一点</span>` }),
+        h('div', { class: 'more-tabs' }, tabs)),
+      panel);
   }
 
-  // 大楼地图页
-  function world(start) {
-    document.title = '大楼地图｜知识地图';
-    let on = zones.some((z) => z.id === start) ? start : (zones[0] && zones[0].id);
-    const map = h('div', { class: 'world-map' });
-    const detail = h('div', { class: 'world-detail card' });
-
-    function paint() {
-      const z = zones.find((x) => x.id === on);
-      map.replaceChildren(building({ on, pick: (id) => { on = id; history.replaceState(null, '', `#/world/${id}`); paint(); } }));
-      const list = chapters.filter((c) => c.group === z.id);
-      const cmds = commandsIn(list);
-      detail.replaceChildren(
-        h('div', { class: 'world-detail-head' },
-          h('span', { class: 'zone-icon', html: icon(z.icon) }),
-          h('div', {}, h('small', {}, z.group), h('h2', {}, z.name))),
-        h('p', { html: rich(z.line) }),
-        pairs(z.pairs),
-        cmds.length ? h('div', { class: 'world-cmds' }, h('small', {}, '在这里学过的命令'), h('div', {}, cmds.map((w) => h('code', {}, w)))) : null,
-        h('div', { class: 'tiles' }, list.map((c) =>
-          h('a', { class: 'tile elastic', href: chapterUrl(c), draggable: 'false' },
-            h('span', { class: 'tile-title', html: rich(c.title) }),
-            h('span', { class: 'tile-date' }, c.date)))));
-    }
-    paint();
-
-    return [
-      h('header', { class: 'hero' },
-        h('h1', {}, '大楼', h('span', { class: 'grad' }, '地图')),
-        h('p', {}, '全站共用一个比喻：把 Linux 想成一栋大楼，Python 是楼上的工作室。每学一个新东西，就知道它是在哪一间做事。'),
-        h('div', { class: 'meta' }, tag('补充：这个比喻是另外加的，不在原始笔记里', 'sparkle', 'warm'))),
-      h('section', { class: 'group-sec world-legend' },
-        h('div', { class: 'home-head' }, h('h2', { class: 'with-i', html: `${icon('bulb')}<span>先记住这几组对应</span>` })),
-        pairs(KM.worldPairs)),
-      h('section', { class: 'world-sec' }, map, detail),
-    ];
+  // 文章开头的情境故事：默认收起
+  function storyFold(d) {
+    return h('details', { class: 'story-fold lit reveal' },
+      h('summary', {},
+        h('span', { class: 'story-fold-icon', html: icon('sparkle') }),
+        h('span', { class: 'story-fold-text' },
+          h('small', {}, '补充・情境故事'),
+          h('b', { html: rich(d.title) })),
+        h('span', { class: 'story-fold-go', html: icon('forward') })),
+      d.lead ? h('p', { class: 'story-fold-lead', html: rich(d.lead) }) : null,
+      story(d));
   }
+
+  KM.blocks = { oops, behind, story, poster, alt, more, storyFold };
 
   // 把 deepen 的数据并进文章 ---------------------------------------------------
   for (const [id, d] of KM.extras || []) {
     const c = chapters.find((x) => x.id === id);
     if (!c) { console.warn('deepen 找不到文章：', id); continue; }
-    if (d.world) c.world = d.world;
     for (const [nav, blocks] of Object.entries(d.at || {})) {
       const s = c.sections.find((x) => x.nav === nav);
       if (!s) { console.warn(`deepen 找不到小节：${id} / ${nav}`); continue; }
-      s.blocks.push(...blocks);
+      for (const b of blocks) {
+        if (KINDS[b.type]) (s.more = s.more || []).push(b);
+        else s.blocks.push(b);
+      }
     }
     if (d.poster) {
       const last = c.sections[c.sections.length - 1];
       last.blocks.unshift({ type: 'poster', ...d.poster });
     }
-    if (d.story) {
-      c.sections.unshift({
-        nav: '故事', kicker: '补充・情境故事', title: d.story.title, lead: d.story.lead,
-        blocks: [{ type: 'story', steps: d.story.steps }],
-      });
-    }
+    if (d.story) c.story = d.story;
   }
-
-  KM.world = { page: world, strip, zones };
 })();

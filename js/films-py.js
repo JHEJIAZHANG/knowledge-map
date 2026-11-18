@@ -1,4 +1,4 @@
-// Python 的情境短片：发生在大楼 4F 的 Python 工作室
+// Python 的情境短片
 // 写法和 js/films.js 相同，共用 Movie.prototype 上的道具
 (function () {
   const { Movie } = window.KnowledgeMap;
@@ -38,8 +38,8 @@
         m.g([svg('rect', { x: -78, y: -170, width: 156, height: 340, rx: 18, class: 'f-shaft' })], { x: 480, y: 270 });
         m.g([svg('path', { d: 'M0 0H330', class: 'f-stroke' })], { x: 50, y: 404 });
         m.g([svg('path', { d: 'M0 0H330', class: 'f-stroke' })], { x: 580, y: 270 });
-        m.t('1F・服务台', { x: 215, y: 436 }, 'f-hint');
-        m.t('4F・Python 工作室', { x: 745, y: 300 }, 'f-hint');
+        m.t('楼下・Shell', { x: 215, y: 436 }, 'f-hint');
+        m.t('楼上・Python', { x: 745, y: 300 }, 'f-hint');
         const level = m.t('1F', { x: 480, y: 128 }, 'f-line');
         const car = m.g([svg('rect', { x: -62, y: -84, width: 124, height: 130, rx: 14, class: 'f-hl' })], { x: 480, y: 358, o: 0.5 });
         const banner = m.screen('Python 3.10.12 … on linux', 745, 372);

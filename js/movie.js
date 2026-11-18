@@ -63,14 +63,6 @@
     t.style.fontSize = w > room ? `${Math.max(0.55, room / w) * sizeOf(cls)}px` : '';
   }
 
-  // 这支片用在哪一篇文章，就发生在那个分类对应的房间
-  function zoneOf(id) {
-    const zones = KM.zones || [];
-    const c = KM.chapters.find((ch) => ch.sections.some((s) => s.blocks.some((b) => b.type === 'movie' && b.film === id)));
-    const i = c ? zones.findIndex((z) => z.id === c.group) : -1;
-    return i < 0 ? null : { name: zones[i].sign || zones[i].name, floor: Math.floor(i / 2) + 1 };
-  }
-
   class Movie {
     constructor(block) {
       this.id = block.film;
@@ -205,18 +197,9 @@
       this.stage.querySelectorAll('g > text').forEach(fitText);
     }
 
-    // 场景：每支片都发生在大楼的某一间。画出地板，并在服务台（终端机）右边挂上房间的门牌
+    // 场景：画出地板
     set() {
-      if (this.zone === undefined) this.zone = zoneOf(this.id);
       this.stage.append(svg('path', { d: 'M24 468H936', class: 'f-floor' }));
-      this.sign = null;
-      if (!this.zone) return;
-      const str = `${this.zone.floor}F・${this.zone.name}`;
-      const w = measure(str, 'f-sign-text') + 28;
-      this.signLeft = 916 - w;
-      this.sign = svg('g', { class: 'f-sign-g', transform: `translate(${916 - w / 2} 46)` },
-        svg('rect', { x: -w / 2, y: -15, width: w, height: 30, rx: 15, class: 'f-sign' }),
-        text(str, { x: 0, y: 5.5, class: 'f-sign-text' }));
     }
 
     actor(node, init) {
@@ -282,7 +265,6 @@
       const x = +line.getAttribute('x');
       const w = line.getComputedTextLength();
       if (x + w > 910) line.style.fontSize = `${parseFloat(getComputedStyle(line).fontSize) * (910 - x) / w}px`;
-      if (this.sign) this.sign.classList.toggle('away', x + Math.min(w, 910 - x) > this.signLeft - 12);
     }
 
     // 控制 ---------------------------------------------------------------------
@@ -365,7 +347,6 @@
       const prompt = svg('tspan', { class: 'f-ps' }, ps);
       const line = svg('text', { x: 56, y: 53, class: 'f-mono' }, prompt, typed);
       this.actor(svg('g', {}, svg('rect', { x: 30, y: 18, width: 900, height: 56, rx: 16, class: 'f-term' }), line));
-      if (this.sign) this.stage.append(this.sign);
       typed.prompt = prompt;
       return typed;
     }

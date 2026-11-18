@@ -7,16 +7,7 @@
   const TB = 'Traceback (most recent call last):\n  File "<stdin>", line 1, in <module>\n';
   const alt = (rows, title) => ({ type: 'alt', title, rows });
 
-  // 大楼的 4F：Python 工作室 ------------------------------------------------------
-  KM.worldPairs.push(['python', '搭电梯上 4F 工作室'], ['变量', '挂在值上的名牌']);
-  KM.zones.push({
-    id: 'py-basics', icon: 'code', name: 'Python 工作室', group: '交互模式与变量',
-    line: '从一楼服务台打 `python` 搭电梯上来。这里的柜员只听得懂 Python，打一行就做一行，`exit()` 下楼。',
-    pairs: [['python', '搭电梯上 4F'], ['>>>', '柜员在等你说下一句'], ['变量 = 值', '把名牌挂到盒子上'], ['print()', '用广播念出来'], ['input()', '递一张问卷，等你填'], ['int()', '换算柜台：文本换成数字'], ['exit()', '下楼回服务台']],
-  });
-
   KM.deepen('python-repl', {
-    world: [['python', '搭电梯上 4F'], ['变量 = 值', '把名牌挂到盒子上'], ['exit()', '下楼回服务台']],
     story: {
       title: '帮饮料店算一笔账',
       lead: '朋友的饮料店要你帮忙算钱。你手边只有一台 Linux 服务器，没有计算机。',
@@ -34,17 +25,17 @@
       title: '交互模式里的五个动作',
       lanes: [
         { name: '进出', flow: true, nodes: [
-          { cmd: 'python', does: '进入，提示字符变成 `>>>`', as: '搭电梯上 4F' },
-          { cmd: 'exit()', does: '离开，名字全部清掉', as: '下楼回服务台' },
+          { cmd: 'python', does: '进入，提示字符变成 `>>>`' },
+          { cmd: 'exit()', does: '离开，名字全部清掉' },
         ] },
         { name: '记住', flow: true, nodes: [
-          { cmd: 'x = 42', does: '右边先算好，再挂上名牌', as: '挂名牌' },
-          { cmd: 'x', does: '显示名牌挂着的值', as: '看名牌下面的盒子' },
+          { cmd: 'x = 42', does: '右边先算好，再挂上名牌' },
+          { cmd: 'x', does: '显示名牌挂着的值' },
         ] },
         { name: '问与答', flow: true, nodes: [
-          { cmd: 'input("问题")', does: '印出问题，等你回答，交回文本', as: '递问卷' },
-          { cmd: 'int(…)', does: '文本换成整数', as: '换算柜台' },
-          { cmd: 'print(…)', does: '印出来，逗号变空格', as: '广播' },
+          { cmd: 'input("问题")', does: '印出问题，等你回答，交回文本' },
+          { cmd: 'int(…)', does: '文本换成整数' },
+          { cmd: 'print(…)', does: '印出来，逗号变空格' },
         ] },
       ],
       line: '打一行跑一行；值要挂上名牌才留得住，离开就全部清掉。',

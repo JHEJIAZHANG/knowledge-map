@@ -131,7 +131,7 @@
 
     const cards = list.map((item, n) => {
       const why = h('p', { class: 'quiz-why', hidden: '' });
-      const card = h('div', { class: 'cell card reveal lit quiz-card', style: '--span:6' },
+      const card = h('div', { class: 'card lit quiz-card' },
         tag(`第 ${n + 1} 题`, 'pencil', 'plain'),
         h('h3', { html: rich(item.q) }));
       const shake = (el) => {
@@ -144,6 +144,7 @@
         why.innerHTML = `${icon(ok ? 'checkCircle' : 'bulb')}<span>${rich(item.why)}</span>`;
         why.hidden = false;
         if (ok) { right++; paintScore(); }
+        paintNav();
       };
 
       if (item.choices) {
@@ -202,13 +203,38 @@
       return card;
     });
 
+    // 一次只看一题：下面是题号圆点和上一题、下一题
+    let at = 0;
+    const dots = list.map((_, i) => h('button', { class: 'quiz-dot', type: 'button', 'aria-label': `第 ${i + 1} 题`, onclick: () => go(i) }, String(i + 1)));
+    const prev = h('button', { class: 'quiz-nav elastic', type: 'button', html: `${icon('back')}<span>上一题</span>`, onclick: () => go(at - 1) });
+    const next = h('button', { class: 'quiz-nav next elastic', type: 'button', html: `<span>下一题</span>${icon('forward')}`, onclick: () => go(at + 1) });
+    function paintNav() {
+      dots.forEach((d, k) => {
+        d.classList.toggle('on', k === at);
+        d.classList.toggle('ok', cards[k].classList.contains('ok'));
+        d.classList.toggle('shown', cards[k].classList.contains('shown'));
+        if (k === at) d.setAttribute('aria-current', 'step'); else d.removeAttribute('aria-current');
+      });
+      prev.disabled = at === 0;
+      next.disabled = at === list.length - 1;
+      next.classList.toggle('ready', cards[at].classList.contains('done') && at < list.length - 1);
+    }
+    function go(i) {
+      at = Math.max(0, Math.min(list.length - 1, i));
+      cards.forEach((c, k) => { c.hidden = k !== at; });
+      paintNav();
+    }
+    go(0);
+
     return h('section', { class: 'sec quiz', id: 'quiz' },
       h('header', { class: 'sec-head reveal' },
         h('div', { class: 'kicker' }, '小测验'),
         h('h2', {}, '考考自己'),
         h('p', {}, '不用翻回去看，凭印象回答。答错两次可以看答案。'),
         score),
-      h('div', { class: 'bento' }, cards));
+      h('div', { class: 'quiz-stage reveal lit' },
+        cards,
+        h('div', { class: 'quiz-foot' }, prev, h('div', { class: 'quiz-dots' }, dots), next)));
   }
 
   KM.pages = { memo, cheat, quiz, filmsOf };

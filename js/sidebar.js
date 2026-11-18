@@ -119,7 +119,6 @@
   const homeLink = h('a', { class: 'side-item elastic', href: '#/', draggable: 'false', html: icon('home') }, h('span', {}, '首页'));
   const memoLink = h('a', { class: 'side-item elastic', href: '#/memo', draggable: 'false', html: icon('bulb') }, h('span', {}, '口诀总表'));
   const cheatLink = h('a', { class: 'side-item elastic', href: '#/cheat', draggable: 'false', html: icon('terminal') }, h('span', {}, '命令速查'));
-  const worldLink = h('a', { class: 'side-item elastic', href: '#/world', draggable: 'false', html: icon('building') }, h('span', {}, '大楼地图'));
   const panel = h('aside', { class: 'sidebar glass lit', 'aria-label': '网站导览' },
     h('div', { class: 'side-head' },
       h('a', { class: 'side-brand', href: '#/', draggable: 'false' }, '知识', h('span', { class: 'grad' }, '地图')),
@@ -131,8 +130,7 @@
         h('span', {}, '搜索'),
         h('kbd', {}, /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K')),
       memoLink,
-      cheatLink,
-      worldLink),
+      cheatLink),
     tree,
     h('section', { class: 'mini', 'aria-label': '本月上传日历' },
       h('div', { class: 'mini-head' }, miniTitle, miniPrev, miniNext),
@@ -177,7 +175,6 @@
     homeLink.classList.toggle('on', page.type === 'home');
     memoLink.classList.toggle('on', page.type === 'memo');
     cheatLink.classList.toggle('on', page.type === 'cheat');
-    worldLink.classList.toggle('on', page.type === 'world');
     for (const g of groups.values()) g.link.classList.remove('on');
     for (const [c, a] of links) {
       const on = page.chapter === c;

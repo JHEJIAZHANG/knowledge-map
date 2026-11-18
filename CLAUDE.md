@@ -21,20 +21,24 @@
    - 情境短片 `movie`（一个固定比喻，结尾是口诀），
    - 最后一节的逐步演示 `run`（输出要和记录一致；`js/run.js` 和 `js/py.js` 会在主控台警告对不上的地方），
    - 小测验 `quiz`。
-3. 在 `content/<主题>/deepen.js` 加 `KM.deepen('文章 id', {...})`：`world`、`story`、`poster`，以及用 `at` 加到各小节的 `oops`（翻车现场）、`behind`（幕后视角）、`alt`（换个写法，原本的写法照样保留）。
+3. 在 `content/<主题>/deepen.js` 加 `KM.deepen('文章 id', {...})`：`story`、`poster`，以及用 `at` 加到各小节的 `oops`（翻车现场）、`behind`（幕后视角）、`alt`（换个写法，原本的写法照样保留）。
 4. 新命令补进 `js/anatomy.js` 的 `DOC`（Python 内置函数在 `PYDOC`）。
 5. 新的短片写在 `js/films.js`（Shell）或 `js/films-py.js`（Python）。
 
-## 全站比喻：一栋大楼
+## 版面原则（2026-11-18 重构）
 
-`KM.zones` 每个分类一间房间，两间一层：1F 服务台/管理室、2F 走廊与门牌/房间与文档、3F 复印室/阅览室、4F 工单室（Shell 脚本）/Python 工作室。机器人是 Shell，工单是命令，变量是挂在值上的名牌。新分类要在 `topics.js` 加 group，并在 deepen.js 加 zone。
+- 文章只让主线占版面：说明、终端机、短片、逐步演示。
+- 补充内容默认收起：情境故事 `story` 收在文章开头，点开才展开；`oops`、`behind`、`alt` 收进每节最后的「补充・想多看一点」分段标签，一次只展开一张。
+- 小测验一次一题，下面有题号圆点和上一题、下一题。
+- 首页顺序：搜索、继续学习（上次看到的那篇和下一篇）、课程目录（编号就是学习顺序）、学习记录（日历、统计、最近添加）。
+- **不用全站的大楼比喻**：用户觉得没帮助，已经拿掉大楼地图页、文章开头的楼层条、短片里的楼层门牌。分类直接用名称（Shell 基础、Shell 脚本…）。每个概念自己的比喻照常用（机器人是 Shell，变量是挂在值上的名牌）。新分类只要在 `topics.js` 加 group。
 
 ## 检查方式
 
 - 语法：`node -e "new Function(require('fs').readFileSync('文件','utf8'))"`。
 - 把 `index.html css js content` 复制到暂存目录，用 `python3 -m http.server 8765 --bind 127.0.0.1` 开起来，在浏览器设成 1440×900：
-  - 每篇、首页、`#/cheat`、`#/memo`、`#/world` 都没有横向跑版（`scrollWidth <= innerWidth`），
-  - 短片文字没有超框或重叠：把 `tools/audit.js` 一起复制过去，在页面里 `eval(await (await fetch('audit.js')).text())` 后运行 `await auditFilms()`，它会逐镜头检查（`pipe#5` 和 `escape#1` 的门牌重叠是预期的，门牌会淡出），
+  - 每篇、首页、`#/cheat`、`#/memo` 都没有横向跑版（`scrollWidth <= innerWidth`），
+  - 短片文字没有超框或重叠：把 `tools/audit.js` 一起复制过去，在页面里 `eval(await (await fetch('audit.js')).text())` 后运行 `await auditFilms()`，它会逐镜头检查，结果应该是空数组，
   - 主控台没有「仿真结果和实际输出不同」的警告。
 
 ## 回报

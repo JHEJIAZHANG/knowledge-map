@@ -111,7 +111,26 @@
     const cal = KM.calendar({ selected: pickedDay, onPick: (day) => { pickedDay = day; paintList(); KM.sidebar.setDay(day); } });
     paintList();
 
-    // 知识地图：每个主题底下依分类分区
+    // 继续学习：上次看到的那篇；还没看过就从第一篇开始
+    const last = memory.get('km-last');
+    const lastChapter = last && chapters.find((c) => c.id === last.id);
+    const lastNav = lastChapter && lastChapter.sections.some((s) => s.nav === last.nav) ? last.nav : null;
+    const first = topics.map((t) => inTopic(t.id)[0]).find(Boolean);
+    const goTo = lastChapter || first;
+    const goNext = lastChapter && inTopic(lastChapter.topic)[inTopic(lastChapter.topic).indexOf(lastChapter) + 1];
+    const resume = h('section', { class: 'resume-wrap reveal' },
+      h('a', { class: 'resume lit elastic', href: chapterUrl(goTo, lastNav), draggable: 'false' },
+        h('span', { class: 'resume-icon', html: icon(lastChapter ? 'bookmark' : 'play') }),
+        h('span', { class: 'resume-body' },
+          h('small', {}, lastChapter ? '继续学习・上次看到这里' : '从第一篇开始'),
+          h('b', { html: rich(goTo.title) }),
+          h('span', { class: 'resume-nav' }, lastNav ? `小节：${lastNav}` : `${groupOf(goTo).name}・第 ${numberIn(goTo)} 篇`)),
+        h('span', { class: 'path-go', html: icon('arrow') })),
+      goNext ? h('a', { class: 'resume-next lit elastic', href: chapterUrl(goNext), draggable: 'false' },
+        h('small', {}, '下一篇'),
+        h('b', { html: rich(goNext.title) })) : null);
+
+    // 课程目录：每个主题底下依分类分区，编号就是学习顺序
     const maps = topics.filter((t) => inTopic(t.id).length).map((t) =>
       h('section', { class: 'home-sec' },
         h('div', { class: 'home-head' },
@@ -125,28 +144,20 @@
               h('h3', {}, group.name),
               h('span', { class: 'zone-count' }, String(list.length))),
             h('div', { class: 'tiles' }, list.map((c) =>
-              h('a', { class: 'tile elastic', href: chapterUrl(c), draggable: 'false' },
-                h('span', { class: 'tile-title', html: rich(c.title) }),
-                h('span', { class: 'tile-date' }, c.date)))))))));
-
-    // 上次看到这里
-    const last = memory.get('km-last');
-    const lastChapter = last && chapters.find((c) => c.id === last.id);
-    const lastNav = lastChapter && lastChapter.sections.some((s) => s.nav === last.nav) ? last.nav : null;
-    const resume = lastChapter ? h('a', { class: 'resume lit elastic reveal', href: chapterUrl(lastChapter, lastNav), draggable: 'false' },
-      h('span', { class: 'resume-icon', html: icon('bookmark') }),
-      h('span', { class: 'resume-body' },
-        h('small', {}, '上次看到这里'),
-        h('b', { html: rich(lastChapter.title) }),
-        lastNav ? h('span', { class: 'resume-nav' }, `小节：${lastNav}`) : null),
-      h('span', { class: 'path-go', html: icon('arrow') })) : null;
+              h('a', { class: `tile elastic${lastChapter === c ? ' here' : ''}`, href: chapterUrl(c), draggable: 'false' },
+                h('span', { class: 'tile-n' }, pad(numberIn(c))),
+                h('span', { class: 'tile-body' },
+                  h('span', { class: 'tile-title', html: rich(c.title) }),
+                  h('span', { class: 'tile-date' }, c.date))))))))));
 
     return [
       hero,
       resume,
-      h('div', { class: 'bento' }, cal, statCard()),
-      h('section', { class: 'home-sec' }, listHost),
       ...maps,
+      h('section', { class: 'home-sec home-log', id: 'home-log' },
+        h('div', { class: 'home-head' }, homeTitle('calendarCheck', '学习记录')),
+        h('div', { class: 'bento' }, cal, statCard()),
+        h('div', { class: 'home-list' }, listHost)),
     ];
   }
 
@@ -202,7 +213,7 @@
           const make = BLOCKS[b.type] || KM.blocks[b.type];
           if (!make) { console.warn('未知的区块种类：', b.type); return null; }
           return make(b);
-        }))));
+        }), s.more && s.more.length ? KM.blocks.more(s.more) : null)));
 
     const siblings = inTopic(c.topic);
     const next = siblings[siblings.indexOf(c) + 1];
@@ -212,7 +223,7 @@
         h('b', { html: rich(next ? next.title : `回到${topic.name}`) })),
       h('span', { class: 'path-go', html: icon('arrow') }));
 
-    return [hero, KM.world.strip(c), ...sections, KM.pages.quiz(c), end];
+    return [hero, c.story ? KM.blocks.storyFold(c.story) : null, ...sections, KM.pages.quiz(c), end];
   }
 
   // 浮岛：指示块的两侧用不同刚性，前缘先到、后缘跟上，移动时会自然拉长 ---------------
@@ -307,8 +318,6 @@
     }
     if (hash === '#/memo') return { type: 'memo', key: 'memo' };
     if (hash === '#/cheat') return { type: 'cheat', key: 'cheat' };
-    m = hash.match(/^#\/world(?:\/(.+))?$/);
-    if (m) return { type: 'world', key: 'world', zone: m[1] ? decodeURIComponent(m[1]) : null };
     return { type: 'home', key: 'home' };
   }
 
@@ -331,7 +340,6 @@
       : page.type === 'topic' ? renderTopic(page.topic)
       : page.type === 'memo' ? KM.pages.memo()
       : page.type === 'cheat' ? KM.pages.cheat()
-      : page.type === 'world' ? KM.world.page(page.zone)
       : renderHome();
     view.replaceChildren(...parts.filter(Boolean));
     current = page.key;
@@ -369,13 +377,12 @@
       film.classList.add('spot');
       setTimeout(() => film.classList.remove('spot'), 1600);
     }
-    if (scrollToList && page.type === 'home') view.querySelector('.home-sec')?.scrollIntoView({ block: 'center' });
+    if (scrollToList && page.type === 'home') document.getElementById('home-log')?.scrollIntoView({ block: 'start' });
     scrollToList = false;
   }
 
   function route() {
     const page = parse();
-    if (page.key === current && page.type === 'world') { render(page); return; }
     if (page.key === current) { jump(page.nav); return; }
     if (!document.startViewTransition || reduced() || document.hidden || !view.childElementCount) { render(page); return; }
     // 转场方向：往后面的文章向左滑，往前面的文章或回到列表向右滑

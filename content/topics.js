@@ -51,11 +51,11 @@
  *
  * 加深印象的补充内容写在 content/主题/deepen.js，一篇文章一段：
  * KnowledgeMap.deepen('文章 id', {
- *   world: [[名词, 大楼里的比喻]],                       文章开头的对照条，不写就用该分类的前三组
- *   story: { title, lead, steps: [{ say, cmd, note }] }   情境故事，会变成文章的第一个小节
- *   poster: { title, lanes: [{ name, flow: true, nodes: [{ cmd, does, as }] }], line }
- *     一张图总结，放在最后一个小节开头。flow 会在节点之间画箭头；as 是大楼里的说法
- *   at: { '小节的 nav': [ ...区块 ] }                      把下面两种区块加到指定小节的最后
+ *   story: { title, lead, steps: [{ say, cmd, note }] }   情境故事，收在文章开头，点开才展开
+ *   poster: { title, lanes: [{ name, flow: true, nodes: [{ cmd, does }] }], line }
+ *     一张图总结，放在最后一个小节开头。flow 会在节点之间画箭头
+ *   at: { '小节的 nav': [ ...区块 ] }                      oops、behind、alt 收进该小节最后的「补充」分段标签，点了才展开；
+ *                                                           其他种类的区块照常加在小节最后
  * });
  *   { type: 'oops', title, wrong, state: { label, before: [..], after: [..] }, out, why, right, fix }
  *     py: true 表示是 Python 代码（提示字符显示 >>>）；oops、behind 和 story 的步骤都可以加
@@ -64,7 +64,6 @@
  *     幕后视角：这个命令实际动了系统里的哪些地方
  *   { type: 'alt', title, rows: [{ from: '原本的写法', to: [['另一种写法', '差在哪里']] }] }
  *     换个写法：同一件事的其他写法，原本的写法照样保留
- * 大楼的房间（KnowledgeMap.zones）和共用对照（KnowledgeMap.worldPairs）也定义在 deepen.js。
  */
 KnowledgeMap.topic({
   id: 'linux',
