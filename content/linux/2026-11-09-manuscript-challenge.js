@@ -15,8 +15,9 @@
     id: 'manuscript-challenge',
     topic: 'linux',
     group: 'view',
+    kind: 'challenge',
     date: '2026-11-09',
-    title: '挑战：比较两份神秘稿件',
+    title: '比较两份神秘稿件',
     summary: '只用 cat、head、tail 和 diff，找出两个版本的稿件到底差在哪一行。',
     quiz: [
       { q: '要找出两个版本差在哪一行，最直接的命令是哪个？', choices: ['`cat`', '`head`', '`diff`'], answer: 2, why: '`diff` 直接列出不同的行，不用自己一行一行对。' },

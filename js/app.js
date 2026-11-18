@@ -3,7 +3,7 @@
   const KM = window.KnowledgeMap;
   const { chapters, topics } = KM;
   const { h, rich, icon, tag, run, reduced, memory } = KM.ui;
-  const { topicOf, inTopic, groupOf, groupsOf, numberIn, pad, byNewest, chapterUrl, topicUrl, countsByDay } = KM.store;
+  const { topicOf, inTopic, groupOf, groupsOf, numberIn, kindOf, kindId, pad, byNewest, chapterUrl, topicUrl, countsByDay } = KM.store;
 
   const view = document.getElementById('view');
   const island = document.getElementById('island');
@@ -64,8 +64,55 @@
       h('div', { class: 'row-body' },
         named(h('div', { class: 'row-title', html: rich(c.title) }), `title-${vt(c)}`),
         h('div', { class: 'row-sub', html: rich(c.summary) })),
-      tag(groupOf(c).name, groupOf(c).icon, 'plain'),
+      h('span', { class: 'row-tags' }, kindTag(c), tag(`${topicOf(c).name}・${groupOf(c).name}`, groupOf(c).icon, 'plain')),
       h('span', { class: 'row-go', html: icon('forward') }));
+  }
+
+  // 文章类型的小标签：课程不显示，挑战、实战才显示
+  const kindTag = (c) => (kindId(c) === 'lesson' ? null
+    : h('span', { class: `kind kind-${kindId(c)}`, html: icon(kindOf(c).icon) }, kindOf(c).name));
+
+  // 一个单元：标题和一句说明，下面一行一篇
+  function unitBlock(t, group, list, gi, here) {
+    return h('section', { class: 'unit lit reveal' },
+      h('header', { class: 'unit-head' },
+        h('span', { class: 'unit-icon', html: icon(group.icon) }),
+        h('div', { class: 'unit-text' },
+          h('small', {}, `单元 ${gi + 1}・${list.length} 篇`),
+          h('h3', {}, group.name),
+          group.line ? h('p', { html: rich(group.line) }) : null)),
+      h('ol', { class: 'lessons' }, list.map((c) =>
+        h('li', {}, h('a', { class: `lesson elastic${here === c ? ' here' : ''}`, href: chapterUrl(c), draggable: 'false' },
+          h('span', { class: 'lesson-n' }, pad(numberIn(c))),
+          h('span', { class: 'lesson-title', html: rich(c.title) }),
+          kindTag(c),
+          here === c ? h('span', { class: 'lesson-here' }, '上次看到') : null)))));
+  }
+
+  // 课程目录：上面是主题分段标签，一次只显示一个主题
+  function courseMap(here) {
+    const list = topics.filter((t) => inTopic(t.id).length);
+    const saved = memory.get('km-topic');
+    let on = list.find((t) => t.id === (saved || (here && here.topic))) || list[0];
+    const body = h('div', { class: 'course-body' });
+    const tabs = list.map((t) => h('button', {
+      class: 'course-tab elastic', type: 'button', role: 'tab',
+      html: `${icon(t.icon || 'folder')}<span>${rich(t.name)}</span><small>${inTopic(t.id).length}</small>`,
+      onclick: () => { on = t; memory.set('km-topic', t.id); paint(); },
+    }));
+    function paint() {
+      tabs.forEach((b, i) => { b.classList.toggle('on', list[i] === on); b.setAttribute('aria-selected', String(list[i] === on)); });
+      body.replaceChildren(
+        ...groupsOf(on).map(({ group, list: inGroup }) => unitBlock(on, group, inGroup, on.groups.indexOf(group), here)),
+        h('a', { class: 'clear course-all elastic', href: topicUrl(on), draggable: 'false' }, `${on.name}・全部单元`, h('span', { html: icon('forward') })));
+      body.querySelectorAll('.reveal').forEach((el) => el.classList.add('in'));
+    }
+    paint();
+    return h('section', { class: 'home-sec course' },
+      h('div', { class: 'home-head course-head' },
+        homeTitle('list', '课程目录'),
+        h('div', { class: 'course-tabs', role: 'tablist' }, tabs)),
+      body);
   }
 
   // 首页 -------------------------------------------------------------------
@@ -124,31 +171,14 @@
         h('span', { class: 'resume-body' },
           h('small', {}, lastChapter ? '继续学习・上次看到这里' : '从第一篇开始'),
           h('b', { html: rich(goTo.title) }),
-          h('span', { class: 'resume-nav' }, lastNav ? `小节：${lastNav}` : `${groupOf(goTo).name}・第 ${numberIn(goTo)} 篇`)),
+          h('span', { class: 'resume-nav' }, lastNav ? `${topicOf(goTo).name}・小节：${lastNav}` : `${topicOf(goTo).name}・${groupOf(goTo).name}・第 ${numberIn(goTo)} 篇`)),
         h('span', { class: 'path-go', html: icon('arrow') })),
       goNext ? h('a', { class: 'resume-next lit elastic', href: chapterUrl(goNext), draggable: 'false' },
         h('small', {}, '下一篇'),
         h('b', { html: rich(goNext.title) })) : null);
 
     // 课程目录：每个主题底下依分类分区，编号就是学习顺序
-    const maps = topics.filter((t) => inTopic(t.id).length).map((t) =>
-      h('section', { class: 'home-sec' },
-        h('div', { class: 'home-head' },
-          homeTitle(t.icon || 'folder', t.name),
-          h('a', { class: 'clear elastic', href: topicUrl(t), draggable: 'false' }, `全部 ${inTopic(t.id).length} 篇`, h('span', { html: icon('forward') }))),
-        h('div', { class: 'zones' }, groupsOf(t).map(({ group, list }, gi) =>
-          h('section', { class: 'zone lit reveal' },
-            h('header', { class: 'zone-head' },
-              h('span', { class: 'zone-n' }, pad(gi + 1)),
-              h('span', { class: 'zone-icon', html: icon(group.icon) }),
-              h('h3', {}, group.name),
-              h('span', { class: 'zone-count' }, String(list.length))),
-            h('div', { class: 'tiles' }, list.map((c) =>
-              h('a', { class: `tile elastic${lastChapter === c ? ' here' : ''}`, href: chapterUrl(c), draggable: 'false' },
-                h('span', { class: 'tile-n' }, pad(numberIn(c))),
-                h('span', { class: 'tile-body' },
-                  h('span', { class: 'tile-title', html: rich(c.title) }),
-                  h('span', { class: 'tile-date' }, c.date))))))))));
+    const maps = [courseMap(lastChapter)];
 
     return [
       hero,
@@ -177,6 +207,7 @@
             named(h('h2', { html: rich(c.title) }), `title-${vt(c)}`),
             h('p', { html: rich(c.summary) }),
             h('div', { class: 'meta' },
+              kindTag(c),
               tag(c.date, 'calendar', 'plain'),
               tag(`${c.sections.length} 个小节`, 'list', 'plain'),
               demosIn.length ? tag(`${demosIn.length} 段动画`, 'film', 'plain') : null)),
@@ -184,7 +215,11 @@
     };
     const groups = groupsOf(t).map(({ group, list }) =>
       h('section', { class: 'group-sec' },
-        h('div', { class: 'home-head' }, homeTitle(group.icon, group.name)),
+        h('div', { class: 'home-head unit-title' },
+          h('div', {},
+            h('small', {}, `单元 ${t.groups.indexOf(group) + 1}`),
+            homeTitle(group.icon, group.name),
+            group.line ? h('p', { html: rich(group.line) }) : null)),
         h('ol', { class: 'path' }, list.map(card))));
     return [hero, ...groups];
   }
@@ -199,7 +234,8 @@
       h('p', { html: rich(c.summary) }),
       h('div', { class: 'meta' },
         h('a', { class: 'tag elastic', href: topicUrl(topic), draggable: 'false', html: icon(topic.icon || 'folder') }, topic.name),
-        tag(groupOf(c).name, groupOf(c).icon, 'plain'),
+        tag(`单元 ${topic.groups.indexOf(groupOf(c)) + 1}・${groupOf(c).name}`, groupOf(c).icon, 'plain'),
+        kindTag(c),
         tag(`上传于 ${c.date}`, 'upload', 'plain'),
         c.updated ? tag(`更新于 ${c.updated}`, 'clock', 'plain') : null));
 

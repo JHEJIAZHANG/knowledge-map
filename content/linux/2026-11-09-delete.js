@@ -4,7 +4,7 @@
   KnowledgeMap.add({
     id: 'delete-files',
     topic: 'linux',
-    group: 'move',
+    group: 'files',
     date: '2026-11-09',
     title: 'rm：删除文件与目录',
     summary: '终端机没有资源回收桶。学会 rm、rm -i、rmdir、rm -r 的差别，也要知道哪里危险。',

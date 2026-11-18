@@ -5,7 +5,7 @@
   KnowledgeMap.add({
     id: 'navigate-directories',
     topic: 'linux',
-    group: 'paths',
+    group: 'files',
     date: '2026-11-09',
     title: '我在哪里？用 pwd、ls、cd 认路',
     summary: '先知道自己站在哪里，看看周围有什么，再走到想去的目录。',

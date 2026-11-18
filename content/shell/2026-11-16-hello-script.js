@@ -4,7 +4,7 @@
 
   KnowledgeMap.add({
     id: 'hello-script',
-    topic: 'linux',
+    topic: 'shell-script',
     group: 'scripts',
     date: '2026-11-16',
     title: '第一个 Shell 脚本：hello.sh',

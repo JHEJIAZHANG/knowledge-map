@@ -2,9 +2,10 @@
   KnowledgeMap.add({
     id: 'whoami-challenge',
     topic: 'linux',
-    group: 'users',
+    group: 'terminal',
+    kind: 'challenge',
     date: '2026-11-09',
-    title: '挑战：查出目前的用户',
+    title: '查出目前的用户',
     summary: '没有步骤教学，只有目标。从题目的线索，自己选出对的命令。',
     quiz: [
       { q: '题目只说「查出目前的用户名」。你会输入哪个命令？', answer: ['whoami', 'id -un'], why: '关键字是「目前的用户」，对应的就是 `whoami`。' },

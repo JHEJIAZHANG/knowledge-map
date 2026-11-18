@@ -27,9 +27,10 @@
   KnowledgeMap.add({
     id: 'organize-project',
     topic: 'linux',
-    group: 'move',
+    group: 'system',
+    kind: 'project',
     date: '2026-11-15',
-    title: '实战：整理 phoenix 项目，打包旧记录',
+    title: '整理 phoenix 项目，打包旧记录',
     summary: '用 mkdir、mv 把散乱的文件分类归位，用 tree 检查，cp 留备份，最后用 tar 把旧记录打包再删除。',
     quiz: [
       { q: '在 `phoenix_project` 里，一次创建 `src`、`config`、`docs` 三个目录，要打什么？', answer: ['mkdir src config docs'], why: '`mkdir` 后面可以接好几个名字，一次全部建好。' },

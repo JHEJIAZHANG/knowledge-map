@@ -8,7 +8,8 @@
  * KnowledgeMap.add({
  *   id: 'url-safe-id',      // 网址用，不可重复
  *   topic: 'linux',         // 对应下面的主题 id
- *   group: 'shell',         // 对应该主题 groups 里的分类 id
+ *   group: 'files',         // 对应该主题 groups 里的单元 id；单元照学习顺序排
+ *   kind: 'challenge',      // 选填：challenge 挑战、project 实战，不写就是课程。标题不用再加「挑战：」
  *   date: '2026-11-09',     // 上传日期，之后不再更动
  *   updated: '2026-12-01',  // 选填：内容修改的日期
  *   title: '标题',
@@ -69,17 +70,25 @@ KnowledgeMap.topic({
   id: 'linux',
   name: 'Linux 基础',
   icon: 'terminal',
-  // 分类的顺序就是显示的顺序，文章用 group 指定 id
+  // 单元照学习顺序排，文章用 group 指定 id。开始学新东西就在最后加一个单元
   groups: [
-    { id: 'shell', name: 'Shell 基础', icon: 'terminal' },
-    { id: 'users', name: '用户与权限', icon: 'user' },
-    { id: 'paths', name: '目录与路径', icon: 'folder' },
-    { id: 'files', name: '文件操作', icon: 'file' },
-    { id: 'move', name: '复制、移动与删除', icon: 'copy' },
-    { id: 'view', name: '查看与比较', icon: 'eye' },
-    { id: 'scripts', name: 'Shell 脚本', icon: 'list' },
+    { id: 'terminal', name: '认识终端', icon: 'terminal', line: '打开终端机，说第一句话，确认自己是谁。' },
+    { id: 'files', name: '文件与目录', icon: 'folder', line: '认路、创建、复制、搬家、删除。' },
+    { id: 'view', name: '查看文件', icon: 'eye', line: '把文件内容印出来，或比较两份哪里不同。' },
+    { id: 'users', name: '用户与权限', icon: 'user', line: '文件归谁、谁能读写运行，以及怎么管理账号。' },
+    { id: 'system', name: '系统与实战', icon: 'monitor', line: '看懂这台机器，再把学过的命令串起来解决问题。' },
   ],
   summary: '从终端机开始，一个命令一个命令认识 Linux。',
+});
+
+KnowledgeMap.topic({
+  id: 'shell-script',
+  name: 'Shell 脚本',
+  icon: 'list',
+  groups: [
+    { id: 'scripts', name: '脚本与变量', icon: 'list', line: '把命令写进文件一次跑完，再用变量存值。' },
+  ],
+  summary: '把命令写成脚本，让 bash 一次做完。',
 });
 
 KnowledgeMap.topic({
@@ -87,7 +96,7 @@ KnowledgeMap.topic({
   name: 'Python 基础',
   icon: 'code',
   groups: [
-    { id: 'py-basics', name: '交互模式与变量', icon: 'code' },
+    { id: 'py-basics', name: '交互模式与变量', icon: 'code', line: '在 >>> 后面一行一行打 Python，用变量存值。' },
   ],
   summary: '从交互模式开始，一行一行认识 Python。',
 });

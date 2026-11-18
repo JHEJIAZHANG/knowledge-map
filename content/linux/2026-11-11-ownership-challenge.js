@@ -9,8 +9,9 @@
     id: 'ownership-challenge',
     topic: 'linux',
     group: 'users',
+    kind: 'challenge',
     date: '2026-11-11',
-    title: '挑战：设置文件的主人和权限',
+    title: '设置文件的主人和权限',
     summary: '创建 target_file，过户给 user1 和 group1，再把权限设成 -rwxrw----。',
     quiz: [
       { q: '`-rwxr-x---` 换成 `chmod` 用的数字是多少？', hint: '输入三位数字', answer: '750', why: '去掉第 1 格类型。拥有者 `rwx` 是 7，用户组 `r-x` 是 4 + 1 = 5，其他人是 0。' },

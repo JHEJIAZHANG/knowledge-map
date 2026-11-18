@@ -18,7 +18,7 @@
 
   KnowledgeMap.add({
     id: 'shell-variables',
-    topic: 'linux',
+    topic: 'shell-script',
     group: 'scripts',
     date: '2026-11-16',
     title: 'Shell 变量：存一个值，用 $ 拿出来',

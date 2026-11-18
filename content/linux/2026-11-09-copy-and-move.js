@@ -4,7 +4,7 @@
   KnowledgeMap.add({
     id: 'copy-and-move',
     topic: 'linux',
-    group: 'move',
+    group: 'files',
     date: '2026-11-09',
     title: 'cp 和 mv：复制与搬家',
     summary: 'cp 会多出一份，mv 永远只有一份。改名和搬家，其实是同一件事。',

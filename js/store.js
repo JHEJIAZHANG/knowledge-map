@@ -33,6 +33,26 @@
     .map((group) => ({ group, list: inTopic(t.id).filter((c) => c.group === group.id) }))
     .filter((x) => x.list.length);
   const numberIn = (c) => inTopic(c.topic).indexOf(c) + 1;
+
+  // 文章类型：不写就是课程
+  const KINDS = {
+    lesson: { name: '课程', icon: 'book' },
+    challenge: { name: '挑战', icon: 'trophy' },
+    project: { name: '实战', icon: 'flame' },
+  };
+  const kindOf = (c) => KINDS[c.kind] || KINDS.lesson;
+  const kindId = (c) => (KINDS[c.kind] ? c.kind : 'lesson');
+
+  // 单元要照学习顺序：同一主题里，后面的文章不能回到前面的单元
+  for (const t of KM.topics) {
+    const order = (t.groups || []).map((g) => g.id);
+    let at = 0;
+    for (const c of inTopic(t.id)) {
+      const i = order.indexOf(c.group);
+      if (i < at) console.warn(`单元顺序和学习顺序对不上：${c.id} 在「${t.groups[i].name}」，但前面已经学到「${t.groups[at].name}」`);
+      at = Math.max(at, i);
+    }
+  }
   const pad = (n) => String(n).padStart(2, '0');
 
   // 新到旧；同一天内，后加入的排前面
@@ -70,5 +90,5 @@
     return { current, longest };
   };
 
-  KM.store = { parseDay, dayKey, addDays, diffDays, today, topicOf, inTopic, groupOf, groupsOf, numberIn, pad, byNewest, chapterUrl, topicUrl, countsByDay, streaks };
+  KM.store = { parseDay, dayKey, addDays, diffDays, today, topicOf, inTopic, groupOf, groupsOf, numberIn, kindOf, kindId, KINDS, pad, byNewest, chapterUrl, topicUrl, countsByDay, streaks };
 })();

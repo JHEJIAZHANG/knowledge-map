@@ -3,7 +3,7 @@
   KnowledgeMap.add({
     id: 'linux-first-commands',
     topic: 'linux',
-    group: 'shell',
+    group: 'terminal',
     date: '2026-11-09',
     title: '第一次用终端机：打招呼，然后确认我是谁',
     summary: '用 echo 让电脑说话，再用 whoami 和 id 查出目前登录的是谁、有哪些身分。',

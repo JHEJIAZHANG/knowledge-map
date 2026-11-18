@@ -28,7 +28,7 @@
   KnowledgeMap.add({
     id: 'system-info',
     topic: 'linux',
-    group: 'shell',
+    group: 'system',
     date: '2026-11-15',
     title: '认识这台机器：uname、uptime、top，再存成报告',
     summary: '查出系统版本、开机多久、现在有哪些程序在跑，最后用 > 和 >> 把结果收进一个文件。',

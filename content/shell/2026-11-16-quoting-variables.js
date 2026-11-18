@@ -33,7 +33,7 @@
 
   KnowledgeMap.add({
     id: 'quoting-variables',
-    topic: 'linux',
+    topic: 'shell-script',
     group: 'scripts',
     date: '2026-11-16',
     title: '引用变量：\\$、${ } 和双引号',

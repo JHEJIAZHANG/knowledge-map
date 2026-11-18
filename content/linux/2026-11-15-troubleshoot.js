@@ -30,9 +30,10 @@
   KnowledgeMap.add({
     id: 'troubleshoot',
     topic: 'linux',
-    group: 'view',
+    group: 'system',
+    kind: 'challenge',
     date: '2026-11-15',
-    title: '挑战：找出系统出错的原因',
+    title: '找出系统出错的原因',
     summary: '用 grep 从日志文件和配置文件挑出关键的行，用管道 | 过滤内核消息，再用 diff 比对设置和目录，把线索都存成报告。',
     quiz: [
       { q: '只想留下 `app.log` 里含有 `ERROR` 的行，并存进 `error_report.txt`，要打什么？', answer: ['grep "ERROR" app.log > error_report.txt', "grep 'ERROR' app.log > error_report.txt", 'grep ERROR app.log > error_report.txt'], why: '`grep` 只留下有那个字的行；`>` 把结果写进文件。' },
