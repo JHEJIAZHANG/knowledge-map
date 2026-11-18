@@ -6,11 +6,12 @@
 
 :root {
   color-scheme: light;
-  --bg: #ffffff;
-  --card: #f5f5f7;
+  --bg: #f2f3f7;
+  --card: #ffffff;
   --node: rgba(255, 255, 255, .66);
   --glass: rgba(255, 255, 255, .72);
-  --well: rgba(0, 0, 0, .05);
+  --well: rgba(16, 22, 48, .055);
+  --raise: 0 1px 2px rgba(16, 22, 48, .04), 0 6px 24px rgba(16, 22, 48, .06);
   --ink: #0b0b0d;
   --on-ink: #ffffff;
   --text: rgba(0, 0, 0, .9);
@@ -52,11 +53,12 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #050506;
-    --card: #15161a;
+    --bg: #0b0c0f;
+    --card: #18191e;
     --node: rgba(40, 41, 50, .62);
     --glass: rgba(34, 35, 42, .66);
     --well: rgba(255, 255, 255, .08);
+    --raise: none;
     --ink: #f4f4f6;
     --on-ink: #0b0b0d;
     --text: rgba(255, 255, 255, .92);
@@ -80,11 +82,12 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #050506;
-  --card: #15161a;
+  --bg: #0b0c0f;
+  --card: #18191e;
   --node: rgba(40, 41, 50, .62);
   --glass: rgba(34, 35, 42, .66);
   --well: rgba(255, 255, 255, .08);
+  --raise: none;
   --ink: #f4f4f6;
   --on-ink: #0b0b0d;
   --text: rgba(255, 255, 255, .92);
@@ -1344,3 +1347,98 @@ code { white-space: pre-wrap; }
   .course-tab small { display: none; }
   .row-tags .tag { display: none; }
 }
+
+/* =====================================================================
+   设计第二版：灰底白卡、每个单元一个颜色、列表式的行
+   ===================================================================== */
+
+/* 单元颜色：--u 主色、--u2 渐层第二色、--u-soft 淡底 */
+.hue-0 { --u: #3e7bfa; --u2: #6ea8ff; --u-soft: rgba(62, 123, 250, .1); }
+.hue-1 { --u: #12a594; --u2: #4fd1b5; --u-soft: rgba(18, 165, 148, .1); }
+.hue-2 { --u: #f08a24; --u2: #ffb65c; --u-soft: rgba(240, 138, 36, .12); }
+.hue-3 { --u: #7c4dff; --u2: #b18cff; --u-soft: rgba(124, 77, 255, .1); }
+.hue-4 { --u: #ec4f84; --u2: #ff8fb1; --u-soft: rgba(236, 79, 132, .1); }
+.hue-5 { --u: #0e9fd8; --u2: #5cd0f5; --u-soft: rgba(14, 159, 216, .1); }
+
+/* 白卡浮在灰底上 */
+.card, .run, .unit, .row, .resume-next, .story-fold, .zone, .memo-card, .cheat-card, .poster, .quiz-nav, .more-tab, .course-tab.on { box-shadow: var(--raise); }
+.term { box-shadow: 0 10px 30px rgba(10, 10, 20, .14); }
+
+/* 首页标题：后面加一团柔和的彩色光 */
+.hero-home { position: relative; isolation: isolate; }
+.hero-home::before {
+  content: ""; position: absolute; z-index: -1; left: 50%; top: 40px; width: min(880px, 100%); height: 360px; translate: -50% 0;
+  background:
+    radial-gradient(closest-side at 30% 45%, rgba(110, 168, 255, .35), transparent),
+    radial-gradient(closest-side at 62% 40%, rgba(177, 140, 255, .32), transparent),
+    radial-gradient(closest-side at 78% 70%, rgba(255, 143, 177, .26), transparent);
+  filter: blur(20px); pointer-events: none;
+}
+.hero-home .search-cta { background: var(--card); box-shadow: var(--raise); }
+
+/* 继续学习 */
+.resume { box-shadow: 0 14px 36px -10px rgba(95, 67, 230, .55); }
+
+/* 课程目录 */
+.course-tabs { background: rgba(16, 22, 48, .06); }
+.unit { grid-template-columns: minmax(0, 300px) minmax(0, 1fr); padding: 24px; gap: 16px 32px; }
+.unit-icon { width: 48px; height: 48px; border-radius: 15px; background: linear-gradient(140deg, var(--u2), var(--u)); color: #fff; box-shadow: 0 6px 16px -6px var(--u); }
+.unit-icon .icon .d { opacity: .28; }
+.unit-text small { color: var(--u); font-weight: 600; }
+.lessons { gap: 0; padding: 4px 0; border-radius: var(--r-in); background: var(--bg); }
+.lessons li + li .lesson::before { content: ""; position: absolute; left: 56px; right: 16px; top: 0; height: 1px; background: var(--line); opacity: .7; }
+.lesson { position: relative; min-height: 52px; padding: 8px 16px; border-radius: 0; background: none; box-shadow: none !important; }
+.lesson:hover { background: var(--u-soft); }
+.lessons li:first-child .lesson { border-radius: var(--r-in) var(--r-in) 0 0; }
+.lessons li:last-child .lesson { border-radius: 0 0 var(--r-in) var(--r-in); }
+.lessons li:only-child .lesson { border-radius: var(--r-in); }
+.lesson-n { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--u-soft); color: var(--u); font-size: 12.5px; }
+.lesson.here .lesson-n { background: var(--u); color: #fff; }
+.lesson-here { color: var(--u); font-weight: 500; }
+.lesson-go { flex: none; color: var(--text-2); opacity: 0; transition: opacity .2s, translate .2s; }
+.lesson-go .icon { width: 16px; height: 16px; }
+.lesson:hover .lesson-go { opacity: 1; translate: 2px 0; }
+
+/* 主题页、侧边栏、文章标题跟着单元颜色 */
+.group-sec .unit-title small { color: var(--u); font-weight: 600; }
+.group-sec .unit-title h2 .icon { color: var(--u); }
+.group-sec .path-num { background: linear-gradient(120deg, var(--u), var(--u2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.g-block .g-label { color: var(--u); }
+.g-block .a-num { color: var(--u); }
+.chapter-hero .hero-num { background: linear-gradient(120deg, var(--u), var(--u2)); -webkit-background-clip: text; background-clip: text; }
+.chapter-hero .meta .tag.plain:first-of-type { background: var(--u-soft); color: var(--u); }
+.kicker { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: var(--r-pill); background: var(--acc-soft); font-size: 14px; }
+
+/* 学习记录：统计改成四格小卡 */
+.stat-card { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 20px; align-content: stretch; }
+.stat { display: grid; align-content: space-between; gap: 6px; padding: 16px; border-radius: var(--r-in); background: var(--bg); }
+.stat span { white-space: nowrap; font-size: 14px; }
+.stat span .icon { width: 16px; height: 16px; }
+.stat b { font-size: 36px; line-height: 1.1; font-weight: 600; }
+.stat.wide { display: flex; align-items: center; justify-content: space-between; }
+.stat b.small { font-size: 18px; line-height: 1.4; font-weight: 500; }
+.stat:nth-child(1) span .icon { color: #3e7bfa; }
+.stat:nth-child(2) span .icon { color: #12a594; }
+.stat:nth-child(3) span .icon { color: #f08a24; }
+.stat:nth-child(4) span .icon { color: #ec4f84; }
+
+/* 最近添加 */
+.row { border-radius: var(--r-in); }
+.row-date { font-size: 14px; }
+
+@media (max-width: 900px) {
+  .unit { grid-template-columns: minmax(0, 1fr); padding: 18px; }
+}
+@media (max-width: 760px) {
+  .lessons li + li .lesson::before { left: 52px; }
+  .lesson { padding: 8px 12px; }
+  .stat b { font-size: 30px; }
+}
+
+/* 文章：标题收小一点，卡片照内容高度，不硬撑到和旁边一样高 */
+.chapter-hero h1 { font-size: clamp(38px, 4.6vw, 62px); line-height: 1.22; text-wrap: balance; }
+.chapter-hero { padding-bottom: 48px; }
+.sec-head h2 { font-size: clamp(30px, 3.2vw, 44px); }
+.sec .bento { align-items: start; }
+.sec .bento > .term { align-self: stretch; }
+.resume .path-go { background: rgba(255, 255, 255, .22); color: #fff; }

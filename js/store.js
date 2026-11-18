@@ -40,6 +40,8 @@
     challenge: { name: '挑战', icon: 'trophy' },
     project: { name: '实战', icon: 'flame' },
   };
+  // 每个单元一个颜色（css 的 .hue-0 到 .hue-5），照单元顺序轮流用
+  const hueOf = (t, group) => `hue-${Math.max(0, t.groups.indexOf(group)) % 6}`;
   const kindOf = (c) => KINDS[c.kind] || KINDS.lesson;
   const kindId = (c) => (KINDS[c.kind] ? c.kind : 'lesson');
 
@@ -90,5 +92,5 @@
     return { current, longest };
   };
 
-  KM.store = { parseDay, dayKey, addDays, diffDays, today, topicOf, inTopic, groupOf, groupsOf, numberIn, kindOf, kindId, KINDS, pad, byNewest, chapterUrl, topicUrl, countsByDay, streaks };
+  KM.store = { parseDay, dayKey, addDays, diffDays, today, topicOf, inTopic, groupOf, groupsOf, numberIn, hueOf, kindOf, kindId, KINDS, pad, byNewest, chapterUrl, topicUrl, countsByDay, streaks };
 })();

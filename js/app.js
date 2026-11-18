@@ -3,7 +3,7 @@
   const KM = window.KnowledgeMap;
   const { chapters, topics } = KM;
   const { h, rich, icon, tag, run, reduced, memory } = KM.ui;
-  const { topicOf, inTopic, groupOf, groupsOf, numberIn, kindOf, kindId, pad, byNewest, chapterUrl, topicUrl, countsByDay } = KM.store;
+  const { topicOf, inTopic, groupOf, groupsOf, numberIn, hueOf, kindOf, kindId, pad, byNewest, chapterUrl, topicUrl, countsByDay } = KM.store;
 
   const view = document.getElementById('view');
   const island = document.getElementById('island');
@@ -74,7 +74,7 @@
 
   // 一个单元：标题和一句说明，下面一行一篇
   function unitBlock(t, group, list, gi, here) {
-    return h('section', { class: 'unit lit reveal' },
+    return h('section', { class: `unit lit reveal ${hueOf(t, group)}` },
       h('header', { class: 'unit-head' },
         h('span', { class: 'unit-icon', html: icon(group.icon) }),
         h('div', { class: 'unit-text' },
@@ -86,7 +86,8 @@
           h('span', { class: 'lesson-n' }, pad(numberIn(c))),
           h('span', { class: 'lesson-title', html: rich(c.title) }),
           kindTag(c),
-          here === c ? h('span', { class: 'lesson-here' }, '上次看到') : null)))));
+          here === c ? h('span', { class: 'lesson-here' }, '上次看到') : null,
+          h('span', { class: 'lesson-go', html: icon('forward') }))))));
   }
 
   // 课程目录：上面是主题分段标签，一次只显示一个主题
@@ -123,7 +124,7 @@
     const stat = (name, label, value, small) => h('div', { class: `stat${small ? ' wide' : ''}` },
       h('span', { html: icon(name) }, label),
       h('b', { class: small ? 'small' : 'grad' }, value));
-    return h('section', { class: 'cell card lit stat-card reveal', style: '--span:3', 'aria-label': '学习统计' },
+    return h('section', { class: 'cell card lit stat-card reveal', style: '--span:4', 'aria-label': '学习统计' },
       stat('file', '总篇数', String(chapters.length)),
       stat('calendarCheck', '学习天数', String(days.size)),
       stat('flame', '目前连续', String(streak)),
@@ -214,7 +215,7 @@
           h('span', { class: 'path-go', html: icon('arrow') })));
     };
     const groups = groupsOf(t).map(({ group, list }) =>
-      h('section', { class: 'group-sec' },
+      h('section', { class: `group-sec ${hueOf(t, group)}` },
         h('div', { class: 'home-head unit-title' },
           h('div', {},
             h('small', {}, `单元 ${t.groups.indexOf(group) + 1}`),
@@ -228,7 +229,7 @@
   function renderChapter(c) {
     const topic = topicOf(c);
     document.title = `${c.title}｜知识地图`;
-    const hero = h('header', { class: 'hero' },
+    const hero = h('header', { class: `hero chapter-hero ${hueOf(topic, groupOf(c))}` },
       named(h('span', { class: 'hero-num grad' }, pad(numberIn(c))), `num-${vt(c)}`),
       named(h('h1', { html: rich(c.title) }), `title-${vt(c)}`),
       h('p', { html: rich(c.summary) }),

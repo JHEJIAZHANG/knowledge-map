@@ -125,7 +125,7 @@
       [0, 1, 2, 3, 4].map((l) => h('i', { class: `day l${l}` })),
       h('span', {}, '多'));
 
-    const card = h('section', { class: 'cell card lit cal-card reveal', style: '--span:9', 'aria-label': '上传日期表' },
+    const card = h('section', { class: 'cell card lit cal-card reveal', style: '--span:8', 'aria-label': '上传日期表' },
       h('div', { class: 'cal-head' }, title, switcher),
       scroller,
       legend,

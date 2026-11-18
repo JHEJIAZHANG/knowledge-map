@@ -12,6 +12,8 @@
 - 错误消息照 LabEx 的环境写：Shell 是 zsh，脚本是 bash，Python 是 3.10.12。没有实际跑过的，在回报时说明。
 - 用户主要在电脑上看；版面仍要在手机宽度不横向跑版。
 - 视觉风格参照 OPPO ColorOS。标题用 Noto Serif SC，正文 Inter + 苹方，代码 JetBrains Mono（Google Fonts）。
+  - 浅灰底（`--bg`）上放白卡片（`--card`），卡片有轻阴影（`--raise`）。不要改回白底灰卡。
+  - 每个单元一个颜色：`.hue-0` 到 `.hue-5`（`js/store.js` 的 `hueOf`），用在单元图标、编号、侧边栏和文章标题区。
 
 ## 新增一篇文章时要做的事
 
@@ -42,6 +44,9 @@
   - 每篇、首页、`#/cheat`、`#/memo` 都没有横向跑版（`scrollWidth <= innerWidth`），
   - 短片文字没有超框或重叠：把 `tools/audit.js` 一起复制过去，在页面里 `eval(await (await fetch('audit.js')).text())` 后运行 `await auditFilms()`，它会逐镜头检查，结果应该是空数组，
   - 主控台没有「仿真结果和实际输出不同」的警告。
+
+- 看版面用 headless Chrome 截整页图比较可靠（内置浏览器的截图常常停在旧画面）：
+  `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars --force-prefers-reduced-motion --user-data-dir=<暂存目录>/chrome --window-size=1440,3000 --virtual-time-budget=5000 --screenshot=<暂存目录>/home.png "http://127.0.0.1:8765/#/"`，加 `--force-dark-mode` 看深色。
 
 ## 回报
 

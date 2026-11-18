@@ -2,7 +2,7 @@
 (function () {
   const KM = window.KnowledgeMap;
   const { h, rich, icon } = KM.ui;
-  const { inTopic, groupsOf, numberIn, kindOf, kindId, chapterUrl, topicUrl, countsByDay, dayKey, today, pad } = KM.store;
+  const { inTopic, groupsOf, numberIn, hueOf, kindOf, kindId, chapterUrl, topicUrl, countsByDay, dayKey, today, pad } = KM.store;
 
   const KEY = 'km-side';
   const root = document.documentElement;
@@ -45,7 +45,7 @@
       onclick: () => setExpanded(t.id, !groups.get(t.id).el.classList.contains('open')),
     });
     const items = h('div', { class: 't-list' }, groupsOf(t).map(({ group, list: inGroup }) =>
-      h('section', { class: 'g-block' },
+      h('section', { class: `g-block ${hueOf(t, group)}` },
         h('div', { class: 'g-label', html: icon(group.icon) }, h('span', {}, `${t.groups.indexOf(group) + 1}・${group.name}`)),
         h('ol', {}, inGroup.map((c) => {
           const a = h('a', { class: 'a-link elastic', href: chapterUrl(c), draggable: 'false', title: `${plain(c.title)}（${c.date}）` },
