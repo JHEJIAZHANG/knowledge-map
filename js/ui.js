@@ -89,6 +89,7 @@
     tag: duo('<path d="M3.5 12.6V5a1.5 1.5 0 0 1 1.5-1.5h7.6l8 8a1.5 1.5 0 0 1 0 2.1l-7.5 7.5a1.5 1.5 0 0 1-2.1 0z"/>') + '<circle cx="8" cy="8" r="1.4"/>',
     target: duo('<circle cx="12" cy="12" r="8.5"/>') + '<circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".6"/>',
     check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+    lock: duo('<rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/>') + '<path d="M8 10.5V8a4 4 0 0 1 8 0v2.5M12 14.5v2.5"/>',
     pencil: duo('<path d="m4.5 19.5 1-4.6L16 4.4a2.1 2.1 0 0 1 3 3L8.6 18z"/>') + '<path d="m14 6.5 3 3"/>',
   };
 

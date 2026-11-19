@@ -1,6 +1,7 @@
 // 练习场：题目列表（#/practice）和作答页（#/p/题目 id）
 //
 // 作答页左边是题目，右边是模拟终端机（js/shell.js）。按「提交」用题目的 checks 判对错。
+// 设置了服务器的话，可以切换成真终端机（js/real.js），判题用同一套 checks。
 // 通过记录存在 km-practice，每题的终端机状态存在 km-sbx-题目 id。
 (function () {
   const KM = window.KnowledgeMap;
@@ -116,7 +117,8 @@
           h('div', { class: 'course-tabs', role: 'tablist' }, topicTabs)),
         h('div', { class: 'px-chips' }, levelChips),
         body),
-      h('p', { class: 'px-foot' }, '补充：终端机是模拟的，只认得学过的命令，输出照 LabEx 的格式写；遇到不支持的写法会用黄字说明。'),
+      h('p', { class: 'px-foot' }, '补充：默认是模拟终端机，只认得学过的命令，输出照 LabEx 的格式写；遇到不支持的写法会用黄字说明。接上自己的服务器后，可以改用真的 Linux 作答。',
+        KM.real ? h('button', { class: 'rt-link', type: 'button', onclick: () => KM.real.dialog() }, KM.real.configured() ? '真终端机设置' : '接上真终端机') : null),
     ];
   }
 
@@ -223,7 +225,24 @@
 
     const status = h('div', { class: 'sx-status' });
     const files = h('div', { class: 'sx-files' });
-    const editor = makeEditor(sh, (msg) => { add(`${msg}\n`, 'note'); persist(); paintFiles(); syncPrompt(); field.focus({ preventScroll: true }); });
+    // 真终端机（设置了服务器才有）
+    let mode = 'sim';
+    let realS = null;
+    let alive = true;
+    const view = () => (mode === 'real' && realS && realS.view() ? realS.view() : sh);
+    const backend = () => (mode === 'real' && realS ? {
+      files: view().files,
+      read(path) { const n = view().files[path]; if (n && n.content == null) throw new Error('文件太大或不是文字'); return n ? n.content : ''; },
+      save: (path, text, as) => realS.save(path, text, as),
+    } : {
+      files: sh.files,
+      read(path, as) { const was = sh.sudo; sh.sudo = as === 'root'; try { return sh.read(path); } finally { sh.sudo = was; } },
+      save: (path, text, as) => sh.saveFile(path, text, as),
+    });
+    const editor = makeEditor(backend, (msg) => {
+      if (mode === 'real') { if (realS) realS.focus(); return; }
+      add(`${msg}\n`, 'note'); persist(); paintFiles(); syncPrompt(); field.focus({ preventScroll: true });
+    });
 
     // 按 Enter：在等回答（密码、input()、rm -i）时不重印提示字符，回答由 Shell 自己印
     function run(text) {
@@ -275,6 +294,8 @@
 
     // 文件面板：题目目录底下的东西，像 ls -l 一样列出来；点文件可以打开编辑器
     function paintFiles() {
+      const sh = view();
+      const real = mode === 'real';
       const root = sh.root;
       const rows = [];
       const walk = (dir, depth) => {
@@ -283,7 +304,7 @@
           const name = k.split('/').pop();
           const isDir = n.dir;
           const row = h(isDir ? 'div' : 'button', {
-            class: `sx-file${isDir ? ' dir' : ''}${name.startsWith('.') ? ' hid' : ''}${sh.cwd === k ? ' here' : ''}`,
+            class: `sx-file${isDir ? ' dir' : ''}${name.startsWith('.') ? ' hid' : ''}${!real && sh.cwd === k ? ' here' : ''}`,
             style: `--d:${depth}`, type: isDir ? null : 'button',
             title: isDir ? null : `用编辑器打开 ${name}`,
             onclick: isDir ? null : () => editor.open({ path: k, shown: k.slice(root.length + 1), as: 'labex' }),
@@ -291,21 +312,32 @@
             h('span', { class: 'sx-f-name', html: icon(isDir ? 'folder' : 'file') }, h('span', {}, isDir ? `${name}/` : name)),
             h('span', { class: 'sx-f-perm' }, `${isDir ? 'd' : '-'}${n.mode}`),
             h('span', { class: 'sx-f-own' }, `${n.owner}:${n.group}`),
-            h('span', { class: 'sx-f-size' }, isDir ? '' : n.archive ? '压缩包' : `${(n.content || '').length} B`));
+            h('span', { class: 'sx-f-size' }, isDir ? '' : n.archive ? '压缩包' : `${n.size != null ? n.size : (n.content || '').length} B`));
           rows.push(row);
           if (isDir) walk(k, depth + 1);
         });
       };
       walk(root, 0);
       files.replaceChildren(
-        h('div', { class: 'sx-files-h' }, h('span', { html: icon('folder') }, h('b', {}, root), sh.cwd !== root ? h('small', {}, `目前位置：${sh.cwd}`) : null)),
+        h('div', { class: 'sx-files-h' }, h('span', { html: icon('folder') }, h('b', {}, root), !real && sh.cwd !== root ? h('small', {}, `目前位置：${sh.cwd}`) : null, real ? h('small', {}, '真终端机里的文件，打完命令会自动更新') : null)),
         rows.length ? h('div', { class: 'sx-files-list' }, rows) : h('div', { class: 'sx-files-empty' }, '（空的）'));
     }
 
     // 提交
     const submit = h('button', { class: 'px-submit elastic', type: 'button', html: icon('check') }, h('span', {}, '提交'));
-    submit.addEventListener('click', () => {
-      const results = KM.Shell.judge(sh, p.checks);
+    submit.addEventListener('click', async () => {
+      let results;
+      if (mode === 'real') {
+        if (!realS || submit.disabled) return;
+        submit.disabled = true;
+        status.className = 'sx-status';
+        status.replaceChildren(h('b', {}, '在真终端机里检查中…'));
+        try { results = await realS.judge(); } catch (e) {
+          status.className = 'sx-status bad';
+          status.replaceChildren(h('span', { html: icon('close') }), h('b', {}, `检查不了：${e.message}`));
+          return;
+        } finally { submit.disabled = false; }
+      } else results = KM.Shell.judge(sh, p.checks);
       paintReqs(results);
       const left = results.filter((r) => !r.ok).length;
       status.className = `sx-status ${left ? 'bad' : 'ok'}`;
@@ -328,6 +360,13 @@
         if (!reset.dataset.sure) { reset.dataset.sure = '1'; reset.querySelector('span').textContent = '确定重置？'; setTimeout(() => { delete reset.dataset.sure; reset.querySelector('span').textContent = '重置'; }, 2500); return; }
         delete reset.dataset.sure;
         reset.querySelector('span').textContent = '重置';
+        reqs.forEach((r) => { r.className = 'px-req'; r.querySelector('small').textContent = ''; });
+        status.className = 'sx-status';
+        status.replaceChildren();
+        if (mode === 'real') {
+          if (realS) realS.reset().catch((e) => paintMode(`重置失败：${e.message}`, 'bad'));
+          return;
+        }
         sh.reset();
         screen = [];
         repaint();
@@ -343,8 +382,59 @@
     }, h('span', {}, '重置'));
     const intro = () => add('# 在这里输入命令，按 Enter 运行。↑↓ 翻历史，Tab 补全，nano 文件名 打开编辑器。\n', 'dim');
 
+    // 模拟 / 真终端机 切换
+    const modeBtn = h('button', { class: 'sx-mode elastic', type: 'button' }, h('i'), h('span'));
+    const barTitle = h('span', {}, 'labex — zsh');
+    function paintMode(text, state) {
+      const real = mode === 'real';
+      modeBtn.className = `sx-mode elastic ${real ? state || 'ok' : 'sim'}`;
+      modeBtn.querySelector('span').textContent = real ? text || '真终端机' : '模拟终端机';
+      modeBtn.title = real ? '现在用的是服务器上真的 Linux，按一下换回模拟终端机' : '现在用的是模拟终端机，按一下换成真的 Linux';
+      barTitle.textContent = real ? 'labex — zsh（Ubuntu 22.04）' : 'labex — zsh';
+    }
+    const hooks = {
+      onFiles: () => { if (mode === 'real') paintFiles(); },
+      onState: (text, state) => { if (mode === 'real') paintMode(text, state); },
+      onTyped: () => mark(p, { tried: true }),
+    };
+    async function goReal() {
+      if (!KM.real) return;
+      if (!KM.real.configured()) { await KM.real.dialog(); if (!KM.real.configured() || !alive) return; }
+      KM.real.setWanted(true);
+      mode = 'real';
+      term.classList.add('real');
+      paintMode('连接中…', 'busy');
+      try {
+        realS = await KM.real.session(p, hooks);
+        if (!alive || mode !== 'real') { realS.destroy(); realS = null; return; }
+        term.insertBefore(realS.el, editor.el);
+        await realS.open();
+      } catch (e) {
+        if (realS) { realS.destroy(); realS.el.remove(); realS = null; }
+        if (!alive) return;
+        mode = 'sim';
+        term.classList.remove('real');
+        add(`（连不上真终端机：${e.message}。先用模拟终端机。）\n`, 'note');
+        paintMode();
+        paintFiles();
+        syncPrompt();
+      }
+    }
+    function goSim() {
+      if (KM.real) KM.real.setWanted(false);
+      if (realS) { realS.destroy(); realS.el.remove(); realS = null; }
+      mode = 'sim';
+      term.classList.remove('real');
+      paintMode();
+      paintFiles();
+      syncPrompt();
+      field.focus({ preventScroll: true });
+    }
+    modeBtn.addEventListener('click', () => { if (mode === 'real') goSim(); else goReal(); });
+    paintMode();
+
     const term = h('section', { class: 'sx-term' },
-      h('header', { class: 'sx-bar' }, h('i'), h('i'), h('i'), h('span', {}, 'labex — zsh'), reset),
+      h('header', { class: 'sx-bar' }, h('i'), h('i'), h('i'), barTitle, KM.real ? modeBtn : null, reset),
       scroller,
       editor.el);
     const main = h('div', { class: 'px-main' },
@@ -358,18 +448,20 @@
     setTimeout(() => { if (matchMedia('(min-width: 1000px)').matches) field.focus({ preventScroll: true }); scroller.scrollTop = scroller.scrollHeight; }, 60);
     if (solved(p)) { status.className = 'sx-status ok'; status.replaceChildren(h('span', { html: icon('checkCircle') }), h('b', {}, '这题已经通过了，可以再做一次。')); }
 
-    live = { destroy() { live = null; } };
+    if (KM.real && KM.real.wanted()) setTimeout(() => { if (alive) goReal(); }, 0);
+    live = { destroy() { alive = false; if (realS) { realS.destroy(); realS = null; } live = null; } };
     return [h('div', { class: 'px-page' }, side, main)];
   }
 
   // 编辑器：盖在终端机上；保存时照打开时的身分检查权限
-  function makeEditor(sh, done) {
+  function makeEditor(backend, done) {
     let cur = null;
     const title = h('b');
     const area = h('textarea', { class: 'ed-area', spellcheck: 'false', autocapitalize: 'off', 'aria-label': '文件内容' });
     const msg = h('span', { class: 'ed-msg' });
-    const save = () => {
-      const err = sh.saveFile(cur.path, area.value, cur.as);
+    const save = async () => {
+      if (!cur) return;
+      const err = await backend().save(cur.path, area.value, cur.as);
       if (err) { msg.textContent = `存不进去：${err}`; return; }
       const shown = cur.shown;
       close();
@@ -391,14 +483,12 @@
     return {
       el,
       open(target) {
-        const n = sh.files[target.path];
+        const b = backend();
+        const n = b.files[target.path];
         if (n && n.archive) { done(`（${target.shown} 是压缩包，不能用编辑器打开）`); return; }
         // 读不到就不能打开（例如别人的文件）
-        const was = sh.sudo;
-        sh.sudo = target.as === 'root';
         let text = '';
-        try { text = n ? sh.read(target.path) : ''; } catch (e) { sh.sudo = was; done(`（打不开 ${target.shown}：${e.message}）`); return; }
-        sh.sudo = was;
+        try { text = n ? b.read(target.path, target.as) : ''; } catch (e) { done(`（打不开 ${target.shown}：${e.message}）`); return; }
         cur = target;
         title.textContent = `${target.shown}${n ? '' : '（新文件）'}${target.as === 'root' ? '・root' : ''}`;
         msg.textContent = '';

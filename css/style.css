@@ -1658,3 +1658,31 @@ button.sx-file:hover { background: var(--bg); }
   .sx-f-own, .sx-f-size { display: none; }
   .px-navs { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* 真终端机（js/real.js） */
+.sx-term.real .sx-screen { display: none; }
+.sx-term:not(.real) .sx-xterm { display: none; }
+.sx-xterm { min-height: 0; padding: 10px 4px 6px 14px; overflow: hidden; }
+.sx-xterm .xterm { height: 100%; }
+.sx-xterm .xterm-viewport { scrollbar-color: #3a3b42 transparent; }
+.sx-mode { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px 0 10px; border-radius: var(--r-pill); background: rgba(255, 255, 255, .06); color: #b9bcc4; font-size: 13px; white-space: nowrap; }
+.sx-mode:hover { background: rgba(255, 255, 255, .12); color: #fff; }
+.sx-mode > i { width: 8px; height: 8px; border-radius: 50%; background: #6f737d; }
+.sx-mode.ok > i { background: #28c840; box-shadow: 0 0 0 3px rgba(40, 200, 64, .2); }
+.sx-mode.busy > i { background: #febc2e; animation: rt-blink 1s infinite; }
+.sx-mode.bad > i { background: #ff5f57; }
+@keyframes rt-blink { 50% { opacity: .3; } }
+.rt-veil { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px; background: rgba(10, 10, 20, .4); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: note-in .2s var(--soft); }
+.rt-box { display: grid; gap: 14px; width: min(440px, 100%); padding: 24px; }
+.rt-box h2 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 20px; }
+.rt-box h2 .icon { width: 22px; height: 22px; color: var(--acc); }
+.rt-say { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text-2); }
+.rt-field { display: grid; gap: 6px; font-size: 13px; color: var(--text-2); }
+.rt-in { width: 100%; height: 42px; padding: 0 14px; border: 1px solid var(--line, rgba(127, 127, 127, .25)); border-radius: 12px; outline: 0; background: var(--bg); color: var(--text); font: 15px var(--mono); }
+.rt-in:focus { border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-soft); }
+.rt-err { min-height: 1em; margin: 0; font-size: 13px; color: #e5484d; }
+.rt-err:empty { display: none; }
+.rt-acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.rt-link { margin-right: auto; padding: 4px 0; background: none; color: var(--acc); font-size: 13px; }
+.px-foot .rt-link { margin-left: 8px; }
+@media (max-width: 600px) { .sx-mode { padding: 0 9px; } .sx-mode > span { max-width: 6em; overflow: hidden; text-overflow: ellipsis; } }

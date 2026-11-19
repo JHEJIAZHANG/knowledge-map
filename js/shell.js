@@ -1554,7 +1554,8 @@
 
   // 判题 ----------------------------------------------------------------------
   // 每一条检查：{ say: '给人看的说明', …条件 }。路径都是相对题目的 root。
-  function judge(sh, checks) {
+  // real：真终端机判题时，same 和 run 要跑的命令已经先在容器里跑好，放在 real.same[命令]、real.run[i]
+  function judge(sh, checks, real) {
     return checks.map((c) => {
       const p = (x) => norm(sh.root, x);
       const n = (x) => sh.files[p(x)];
@@ -1579,7 +1580,7 @@
         // 压缩包里的文件：只比文件名，不管打包时站在哪一层
         if (c.members) ok = ok && Boolean(node.archive) && JSON.stringify(node.archive.filter((m) => !m.dir).map((m) => base(m.name)).sort()) === JSON.stringify([...c.members].sort());
         // 文件内容要和「某个命令的输出」一模一样
-        if (c.same) { const want = sh.clone().capture(c.same); ok = ok && text === want; }
+        if (c.same) { const want = real ? real.same[c.same] : sh.clone().capture(c.same); ok = ok && text === want; }
         if (c.kids) ok = ok && JSON.stringify(sh.kids(p(target)).map(base).sort()) === JSON.stringify([...c.kids].sort());
       }
       if (c.user) {
@@ -1594,11 +1595,18 @@
       if (c.nouser) ok = ok && !sh.userOf(c.nouser);
       if (c.groupExists) ok = ok && sh.groupList().some((g) => g.name === c.groupExists);
       if (c.run) {
-        const t = sh.clone();
-        got = t.capture(c.run);
-        (c.input || []).forEach((a) => { got += t.capture(a); });
+        let want = c.out;
+        if (real) {
+          // 真的程序从 stdin 读回答，画面上不会出现打进去的字，所以期望的输出要拿掉回答那一段
+          got = real.run[checks.indexOf(c)] || '';
+          if (typeof want === 'string') (c.input || []).forEach((a) => { want = want.replace(`${a}\n`, ''); });
+        } else {
+          const t = sh.clone();
+          got = t.capture(c.run);
+          (c.input || []).forEach((a) => { got += t.capture(a); });
+        }
         got = got.replace(/\n+$/, '');
-        ok = ok && (c.out instanceof RegExp ? c.out.test(got) : got === c.out);
+        ok = ok && (want instanceof RegExp ? want.test(got) : got === want);
       }
       if (c.py) {
         const v = sh.pyVars[c.py];
@@ -1672,5 +1680,6 @@
   Shell.verify = verify;
   Shell.norm = norm;
   Shell.octal = octal;
+  Shell.DMESG = DMESG;
   KM.Shell = Shell;
 })();
