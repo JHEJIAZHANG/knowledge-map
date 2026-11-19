@@ -24,6 +24,18 @@
 | `login.html` | 登录页 |
 | `km-bridge.service` | systemd 设置：开机自动启动，挂掉自己重开 |
 
+## 先在本机预览（不用服务器，也不用设置 Google）
+
+1. 打开 OrbStack（Mac 上的 Docker）。
+2. 第一次要先建 Python 环境：`python3 -m venv ~/km-venv && ~/km-venv/bin/pip install aiohttp`
+3. 在项目文件夹运行 `tools/local-test.sh`，再用浏览器打开 `http://localhost:7681`。
+   - Google 登录用的是假的（`tools/fake-google.py`）。允许的账号是 `me@example.com`，也可以选一个不在名单里的账号试试。
+   - 按 Ctrl+C 结束，临时的设置会自动删掉。
+4. 想在本机试**真的** Google：
+   - 在 Google Cloud 的「已获授权的重定向 URI」另外加上 `http://localhost:7681/auth/callback`；
+   - 运行 `KM_CONFIG=~/.config/km-bridge/local.json ~/km-venv/bin/python server/km-bridge.py setup`，网址填 `http://localhost:7681`；
+   - 再运行 `tools/local-test.sh real`。
+
 ## 部署
 
 ### 1. 传文件（在 Mac 的项目文件夹）

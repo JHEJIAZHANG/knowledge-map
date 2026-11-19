@@ -46,6 +46,7 @@
 - 作答页可以从模拟终端机切换成真的 Linux（服务器上的 Docker 容器）。网页这一边是 `js/real.js`，xterm.js 只在要用时才从 jsdelivr 加载。在服务器上打开时，真终端机共用网站的登录。
 - 题目的起始状态由 `setupScript` 照模拟终端机算出来，在容器里用 root 建好。判题时先拍容器的快照，再用同一个 `judge`，所以题目不用另外写。
 - 容器读不到真的开机日志，`dmesg` 换成练习用的日志，这件事要在画面上说明。
+- 本机预览服务器版：`tools/local-test.sh`（假的 Google，允许 `me@example.com`；要开 OrbStack 和 `~/km-venv`）。改了 `server/` 或登录相关的东西后，用它走一遍登录和真终端机。
 - 加了新题后，如果服务器连得上，用 `KM_TOKEN=token node tools/real-check.js wss://服务器网址/ws` 在真的容器里逐题跑一次。token 由用户在服务器上用 `km-bridge.py token` 产生。
 - 更新网站时，提醒用户用 `rsync` 同步到服务器（命令在 `server/README.md`）。
 - 服务器上的操作由用户自己动手，好让他们学到东西。我负责解说，并写服务器和网页的代码，不自己 SSH 进去操作。

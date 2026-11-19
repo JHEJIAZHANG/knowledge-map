@@ -51,7 +51,7 @@ GOOGLE_TOKEN = os.environ.get('KM_GOOGLE_TOKEN', 'https://oauth2.googleapis.com/
 GOOGLE_ISSUERS = ('https://accounts.google.com', 'accounts.google.com')
 COOKIE = 'km_session'
 FLOW_COOKIE = 'km_oauth'
-SECURE_COOKIE = os.environ.get('KM_INSECURE') != '1'   # 本机测试（http）才关掉
+LOCAL = re.compile(r'^http://(localhost|127\.0\.0\.1)(:\d+)?$')   # 本机预览可以用 http
 MAX_BOXES = 8            # 最多同时留几台容器，超过就删最久没用的
 IDLE_HOURS = 24          # 多久没用就自动删掉
 TOKEN_DAYS = 30          # 登录后记住几天
@@ -93,14 +93,14 @@ def setup():
         keep = f'（直接按 Enter 保留 {old[k]}）' if old.get(k) else ''
         return input(f'{q}{keep}：').strip() or old.get(k, '')
 
-    url = ask('网站网址，例如 https://instance-xxxx.tailxxxx.ts.net', 'public_url').rstrip('/')
+    url = ask('网站网址，例如 https://instance-xxxx.tailxxxx.ts.net（在本机预览用 http://localhost:7681）', 'public_url').rstrip('/')
     cid = ask('Google 的 Client ID', 'client_id')
     sec = getpass.getpass('Google 的 Client secret（输入时不会显示；直接按 Enter 保留原来的）：').strip() or old.get('client_secret', '')
     keep = f"（直接按 Enter 保留 {', '.join(old['allowed'])}）" if old.get('allowed') else ''
     mails = input(f'可以登录的 Gmail，多个用逗号隔开{keep}：').strip()
     allowed = [m.strip().lower() for m in mails.split(',') if m.strip()] or old.get('allowed', [])
-    if not (url.startswith('https://') and cid and sec and allowed):
-        sys.exit('有东西没填，或网址不是 https:// 开头，没有保存。')
+    if not ((url.startswith('https://') or LOCAL.match(url)) and cid and sec and allowed):
+        sys.exit('有东西没填，或网址不是 https:// 开头（本机预览才能用 http://localhost），没有保存。')
     save_config({'public_url': url, 'client_id': cid, 'client_secret': sec, 'allowed': allowed,
                  'secret': old.get('secret') or secrets.token_hex(32)})
     print(f'已保存到 {CONFIG}（权限 600，只有你读得到）。')
@@ -351,8 +351,10 @@ async def ws_handler(request):
 
 
 # 用 Google 登录（OpenID Connect，授权码流程 + PKCE）---------------------------
-def cookie_opts(max_age):
-    return {'max_age': max_age, 'httponly': True, 'secure': SECURE_COOKIE, 'samesite': 'Lax', 'path': '/'}
+def cookie_opts(cfg, max_age):
+    # 只有本机预览（http://localhost）不加 Secure，其他一律只走 https
+    secure = not LOCAL.match(cfg['public_url'])
+    return {'max_age': max_age, 'httponly': True, 'secure': secure, 'samesite': 'Lax', 'path': '/'}
 
 
 def to_login(err=None):
@@ -372,7 +374,7 @@ async def google_start(request):
         'code_challenge': challenge, 'code_challenge_method': 'S256', 'prompt': 'select_account',
     })
     res = web.HTTPFound(f'{GOOGLE_AUTH}?{query}')
-    res.set_cookie(FLOW_COOKIE, sign(cfg, flow), **cookie_opts(600))
+    res.set_cookie(FLOW_COOKIE, sign(cfg, flow), **cookie_opts(cfg, 600))
     raise res
 
 
@@ -408,7 +410,7 @@ async def google_callback(request):
         to_login(f'{email or "这个账号"} 不能登录这个网站。')
     log('登录成功', who_of(request), email)
     res = web.HTTPFound('/' + (flow['next'] if flow['next'].startswith('#') else ''))
-    res.set_cookie(COOKIE, make_token(cfg, email), **cookie_opts(TOKEN_DAYS * 86400))
+    res.set_cookie(COOKIE, make_token(cfg, email), **cookie_opts(cfg, TOKEN_DAYS * 86400))
     res.del_cookie(FLOW_COOKIE, path='/')
     raise res
 
