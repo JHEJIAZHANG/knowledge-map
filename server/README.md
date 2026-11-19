@@ -42,8 +42,8 @@
 
 - 服务器要用的文件：
   `scp -i ~/.ssh/oci_ubuntu.key server/Dockerfile server/km-bridge.py server/login.html server/km-bridge.service ubuntu@140.245.37.255:~/km-term/`
-- 网站文件。以后每次更新网站，也是运行这一行：
-  `rsync -av --delete -e "ssh -i ~/.ssh/oci_ubuntu.key" index.html css js content ubuntu@140.245.37.255:~/km-site/`
+- 网站文件：`tools/deploy.sh`。它其实就是运行 `rsync -av --delete -e "ssh -i ~/.ssh/oci_ubuntu.key" index.html css js content ubuntu@140.245.37.255:~/km-site/`。
+- 以后更新网站：网页改了就运行 `tools/deploy.sh`；改了服务器程序就运行 `tools/deploy.sh server`，它会顺便重启服务。
 
 ### 2. 服务器上的准备
 
