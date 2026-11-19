@@ -1,5 +1,6 @@
 // 真终端机自我检查：在服务器的真容器里，逐题跑参考解答，再用 judge 检查
-// 用法：KM_PW='网站的密码' node tools/real-check.js wss://服务器网址/ws [题目 id …]
+// 用法：KM_TOKEN=token node tools/real-check.js wss://服务器网址/ws [题目 id …]
+// token 在服务器上用 python3 ~/km-term/km-bridge.py token 印出来。
 // 每题会先把容器重置，跑完再删掉，不会留下东西。
 const fs = require('fs');
 const vm = require('vm');
@@ -8,10 +9,10 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const url = process.argv[2];
 const only = process.argv.slice(3);
-if (!url || !process.env.KM_PW) { console.log('用法：KM_PW=密码 node tools/real-check.js wss://服务器网址/ws [题目 id …]'); process.exit(2); }
+if (!url || !process.env.KM_TOKEN) { console.log('用法：KM_TOKEN=token node tools/real-check.js wss://服务器网址/ws [题目 id …]'); process.exit(2); }
 const KM = { problems: [], problem(p) { this.problems.push(p); } };
 KM.ui = { h: () => ({}), icon: () => '', memory: { get: (k, d) => d, set() {} } };
-const ctx = { window: { KnowledgeMap: KM }, KnowledgeMap: KM, console, WebSocket, setTimeout, clearTimeout, btoa };
+const ctx = { window: { KnowledgeMap: KM }, KnowledgeMap: KM, console, WebSocket, setTimeout, clearTimeout, btoa, location: {} };
 ctx.window.window = ctx.window;
 vm.createContext(ctx);
 ['js/py.js', 'js/shell.js', 'content/practice/problems.js', 'js/real.js'].forEach((f) => vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f }));
@@ -20,7 +21,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function main() {
   const conn = new KM.real.Conn(url.replace(/^https/, 'wss'));
   await conn.open();
-  const a = await conn.ask({ t: 'login', password: process.env.KM_PW });
+  const a = await conn.ask({ t: 'auth', token: process.env.KM_TOKEN });
   if (!a.ok) throw new Error(a.err);
   let screen = '';
   let last = Date.now();

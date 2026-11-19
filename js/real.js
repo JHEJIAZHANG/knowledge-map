@@ -1,31 +1,18 @@
 // 真终端机：连到服务器上的桥接服务（server/km-bridge.py），在真的 Ubuntu 22.04 容器里作答
 //
-// 网站放在服务器上（km-bridge.py 送出来的，页面有 km-served 标记）时，直接连同一个网址的 /ws，共用网站的登录。
-// 用 file:// 打开时，要另外设置服务器网址和登录：存在 km-real（网址、token）。km-real-on 记住要不要用真终端机。
+// 只有网站放在服务器上（km-bridge.py 送出来的，页面有 km-served 标记）时才有：直接连同一个网址的 /ws，
+// 共用网站的 Google 登录。用 file:// 打开时只有模拟终端机。km-real-on 记住要不要用真终端机。
 // 每道题一台容器（km-p-题目 id）。第一次开的时候，照模拟终端机算出来的起始状态把文件、用户建好；
 // 判题时把容器里的文件、用户拍一张快照，变成模拟终端机的格式，再用同一套 judge 检查。
 (function () {
   const KM = window.KnowledgeMap;
-  const { h, icon, memory } = KM.ui;
+  const { h, memory } = KM.ui;
   const XTERM = 'https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0';
   const FIT = 'https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0';
 
   const served = typeof document !== 'undefined' && Boolean(document.querySelector('meta[name="km-served"]'));
-  const conf = () => memory.get('km-real', {});
-  const setConf = (patch) => memory.set('km-real', { ...conf(), ...patch });
-  const configured = () => served || Boolean(conf().url);
-  const wanted = () => configured() && memory.get('km-real-on', true);
+  const wanted = () => served && memory.get('km-real-on', true);
   const setWanted = (on) => memory.set('km-real-on', on);
-
-  // 「instance.xxx.ts.net」「https://…」都换成 wss://…
-  function wsUrl(raw) {
-    let u = String(raw || '').trim().replace(/\/+$/, '');
-    if (!u) return '';
-    if (/^https:\/\//.test(u)) u = `wss://${u.slice(8)}`;
-    else if (/^http:\/\//.test(u)) u = `ws://${u.slice(7)}`;
-    else if (!/^wss?:\/\//.test(u)) u = `wss://${u}`;
-    return u;
-  }
 
   // xterm.js：用到才加载 -----------------------------------------------------
   let loading = null;
@@ -59,7 +46,7 @@
         let ws;
         try { ws = new WebSocket(this.url); } catch (e) { bad(new Error('网址的格式不对')); return; }
         this.ws = ws;
-        const why = served ? '连不上服务器' : '连不上服务器（Tailscale 开着吗？）';
+        const why = '连不上服务器';
         const timer = setTimeout(() => { ws.close(); bad(new Error(why)); }, 8000);
         ws.onopen = () => { clearTimeout(timer); ok(); };
         ws.onerror = () => { clearTimeout(timer); bad(new Error(why)); };
@@ -106,75 +93,16 @@
     close() { this.quiet = true; if (this.ws) this.ws.close(); }
   }
 
-  // 登录：先用记住的 token，不行再问密码
+  // 连到同一个网址的 /ws，靠网站登录的 Cookie；登录过期就回登录页
   async function connect() {
-    if (served) {
-      const conn = new Conn(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
-      await conn.open();
-      const r = await conn.ask({ t: 'auth' });
-      if (r.ok) return conn;
-      conn.close();
-      location.replace('/login');   // 登录过期了
-      throw new Error('登录过期了');
-    }
-    const c = conf();
-    const conn = new Conn(wsUrl(c.url));
+    const conn = new Conn(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
     await conn.open();
-    if (c.token) {
-      const r = await conn.ask({ t: 'auth', token: c.token });
-      if (r.ok) return conn;
-    }
-    for (;;) {
-      const pw = await dialog({ need: 'password' });
-      if (pw == null) { conn.close(); throw new Error('没有登录'); }
-      const r = await conn.ask({ t: 'login', password: pw });
-      if (r.ok) { setConf({ token: r.token }); return conn; }
-      dialog.lastError = r.err;
-    }
+    const r = await conn.ask({ t: 'auth' });
+    if (r.ok) return conn;
+    conn.close();
+    location.replace(`/login${location.hash}`);
+    throw new Error('登录过期了');
   }
-
-  // 设置和登录的对话框 ------------------------------------------------------
-  // need: 'password' 只问密码；不写就是完整的设置（网址＋密码）
-  function dialog(o = {}) {
-    return new Promise((done) => {
-      const c = conf();
-      const err = h('p', { class: 'rt-err' }, dialog.lastError || '');
-      dialog.lastError = '';
-      const url = h('input', { class: 'rt-in', type: 'text', value: c.url || '', placeholder: 'instance-xxxx.tailxxxx.ts.net', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
-      const pw = h('input', { class: 'rt-in', type: 'password', placeholder: '桥接服务的密码', autocomplete: 'current-password' });
-      const finish = (v) => { box.remove(); document.removeEventListener('keydown', onKey); done(v); };
-      const onKey = (e) => { if (e.key === 'Escape') finish(null); };
-      const submit = (e) => {
-        e.preventDefault();
-        if (o.need !== 'password') {
-          const u = url.value.trim();
-          if (!u) { err.textContent = '要填服务器的网址。'; return; }
-          if (u !== c.url) setConf({ url: u, token: null });
-        }
-        if (!pw.value && o.need === 'password') { err.textContent = '要输入密码。'; return; }
-        finish(pw.value);
-      };
-      const forget = c.token ? h('button', { class: 'rt-link', type: 'button', onclick: () => { setConf({ token: null }); forget.remove(); } }, '让这台设备登出') : null;
-      const box = h('div', { class: 'rt-veil', onclick: (e) => { if (e.target === box) finish(null); } },
-        h('form', { class: 'rt-box card', onsubmit: submit },
-          h('h2', { html: `${icon('lock')}<span>${o.need === 'password' ? '登录真终端机' : '设置真终端机'}</span>` }),
-          h('p', { class: 'rt-say' }, o.need === 'password'
-            ? '输入你在服务器上用 km-bridge.py passwd 设置的密码（和网站的登录密码一样）。登录后这台设备会记住 30 天。'
-            : '用 file:// 打开网站时才需要设置：填服务器的网址加上 /ws，例如 https://instance-xxxx.tailxxxx.ts.net/ws。'),
-          o.need === 'password' ? null : h('label', { class: 'rt-field' }, h('span', {}, '服务器网址'), url),
-          h('label', { class: 'rt-field' }, h('span', {}, o.need === 'password' ? '密码' : '密码（可以先不填，用到时再问）'), pw),
-          err,
-          h('div', { class: 'rt-acts' },
-            forget,
-            o.need === 'password' ? null : (c.url ? h('button', { class: 'rt-link', type: 'button', onclick: () => { memory.set('km-real', {}); finish(null); } }, '清除设置') : null),
-            h('button', { class: 'px-btn soft elastic', type: 'button', onclick: () => finish(null) }, '取消'),
-            h('button', { class: 'px-btn elastic', type: 'submit' }, o.need === 'password' ? '登录' : '保存'))));
-      document.body.append(box);
-      document.addEventListener('keydown', onKey);
-      (o.need === 'password' || c.url ? pw : url).focus();
-    });
-  }
-  dialog.lastError = '';
 
   // 起始状态：照模拟终端机算出来的文件和用户，写成一段 bash 在容器里用 root 跑 -----------
   const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
@@ -430,5 +358,5 @@ print(json.dumps({'files': files, 'py': py}))
     };
   }
 
-  KM.real = { served, configured, wanted, setWanted, dialog, session, setupScript, conf, Conn, snapshot, judge, boxOf: (p) => `p-${p.id.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`.slice(0, 38) };
+  KM.real = { served, wanted, setWanted, session, setupScript, Conn, snapshot, judge, boxOf: (p) => `p-${p.id.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`.slice(0, 38) };
 })();

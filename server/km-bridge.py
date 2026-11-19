@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """知识地图的网站服务器 + 真终端机桥接服务。
 
-整个网站都要先登录：没登录只看得到登录页，登录后才送出文章、练习场这些文件。
+整个网站都要先用 Google 账号登录，而且只放行设置里写的邮箱。
+没登录只看得到登录页；登录后才送出文章、练习场这些文件。
+Authenticator（两步验证）由 Google 负责：在你的 Google 账号打开两步验证就好。
+
 真终端机走同一个网址的 /ws（WebSocket），共用这次登录：
   box    确认这道题的容器在不在，不在就开一台（km-term 镜像）
   shell  在容器里开一个 zsh，网页打的字送进去，画面送回网页
@@ -9,13 +12,16 @@
   reset  把这道题的容器整台删掉
 
 用法：
-  python3 km-bridge.py passwd     设置登录密码（第一次要先做）
+  python3 km-bridge.py setup      设置 Google 登录（第一次要先做）
   python3 km-bridge.py serve      启动服务（只听 127.0.0.1，靠 tailscale funnel 对外）
+  python3 km-bridge.py token      印出一个 30 天有效的 token，给检查工具用
+  python3 km-bridge.py logout-all 让所有设备都要重新登录
 
 用到 Python 内置模块和 aiohttp（sudo apt install python3-aiohttp）。
 网站文件放在 ~/km-site（用 rsync 从 Mac 同步过来），登录页是同一个文件夹里的 login.html。
 """
 import asyncio
+import base64
 import codecs
 import fcntl
 import getpass
@@ -30,8 +36,9 @@ import struct
 import sys
 import termios
 import time
+from urllib.parse import quote, urlencode
 
-from aiohttp import WSMsgType, web
+from aiohttp import ClientSession, ClientTimeout, WSMsgType, web
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get('KM_PORT', '7681'))
@@ -39,13 +46,15 @@ IMAGE = os.environ.get('KM_IMAGE', 'km-term')
 CONFIG = os.path.expanduser(os.environ.get('KM_CONFIG', '~/.config/km-bridge/config.json'))
 SITE = os.path.realpath(os.path.expanduser(os.environ.get('KM_SITE', '~/km-site')))
 LOGIN_PAGE = os.path.join(HERE, 'login.html')
+GOOGLE_AUTH = os.environ.get('KM_GOOGLE_AUTH', 'https://accounts.google.com/o/oauth2/v2/auth')
+GOOGLE_TOKEN = os.environ.get('KM_GOOGLE_TOKEN', 'https://oauth2.googleapis.com/token')
+GOOGLE_ISSUERS = ('https://accounts.google.com', 'accounts.google.com')
 COOKIE = 'km_session'
+FLOW_COOKIE = 'km_oauth'
 SECURE_COOKIE = os.environ.get('KM_INSECURE') != '1'   # 本机测试（http）才关掉
 MAX_BOXES = 8            # 最多同时留几台容器，超过就删最久没用的
 IDLE_HOURS = 24          # 多久没用就自动删掉
 TOKEN_DAYS = 30          # 登录后记住几天
-LOCK_AFTER = 5           # 连续输错几次就锁住
-LOCK_MINUTES = 15
 BOX_NAME = re.compile(r'^[a-z0-9][a-z0-9-]{0,39}$')
 RUN_FLAGS = [
     '--network', 'none',           # 不能上网
@@ -57,77 +66,80 @@ RUN_FLAGS = [
 ]
 
 used = {}        # 容器名称 → 最后使用时间
-fails = []       # 输错密码的时间
 
 
 def log(*a):
     print(time.strftime('%H:%M:%S'), *a, flush=True)
 
 
-# 设置文件：密码的哈希和签 token 用的密钥 --------------------------------------
+# 设置文件 --------------------------------------------------------------------
+# { public_url, client_id, client_secret, allowed: [邮箱], secret: 签名用的密钥 }
 def load_config():
     with open(CONFIG) as f:
         return json.load(f)
 
 
-def hash_pw(pw, salt):
-    return hashlib.pbkdf2_hmac('sha256', pw.encode(), bytes.fromhex(salt), 300_000).hex()
-
-
-def set_password():
-    pw = getpass.getpass('新密码（至少 12 个字）：')
-    if len(pw) < 12:
-        sys.exit('太短了，至少 12 个字。网站会公开到互联网，密码要够长。')
-    if getpass.getpass('再输入一次：') != pw:
-        sys.exit('两次不一样，没有保存。')
-    salt = secrets.token_hex(16)
-    cfg = {'salt': salt, 'hash': hash_pw(pw, salt), 'secret': secrets.token_hex(32)}
+def save_config(cfg):
     os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
     fd = os.open(CONFIG, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, 'w') as f:
-        json.dump(cfg, f)
+        json.dump(cfg, f, indent=2)
+
+
+def setup():
+    old = load_config() if os.path.exists(CONFIG) else {}
+
+    def ask(q, k):
+        keep = f'（直接按 Enter 保留 {old[k]}）' if old.get(k) else ''
+        return input(f'{q}{keep}：').strip() or old.get(k, '')
+
+    url = ask('网站网址，例如 https://instance-xxxx.tailxxxx.ts.net', 'public_url').rstrip('/')
+    cid = ask('Google 的 Client ID', 'client_id')
+    sec = getpass.getpass('Google 的 Client secret（输入时不会显示；直接按 Enter 保留原来的）：').strip() or old.get('client_secret', '')
+    keep = f"（直接按 Enter 保留 {', '.join(old['allowed'])}）" if old.get('allowed') else ''
+    mails = input(f'可以登录的 Gmail，多个用逗号隔开{keep}：').strip()
+    allowed = [m.strip().lower() for m in mails.split(',') if m.strip()] or old.get('allowed', [])
+    if not (url.startswith('https://') and cid and sec and allowed):
+        sys.exit('有东西没填，或网址不是 https:// 开头，没有保存。')
+    save_config({'public_url': url, 'client_id': cid, 'client_secret': sec, 'allowed': allowed,
+                 'secret': old.get('secret') or secrets.token_hex(32)})
     print(f'已保存到 {CONFIG}（权限 600，只有你读得到）。')
-    print('以前登录过的设备都要重新登录。服务已经在跑的话，要重启：sudo systemctl restart km-bridge')
+    print(f'Google Cloud 里「已获授权的重定向 URI」要填：{url}/auth/callback')
+    print('服务已经在跑的话，要重启：sudo systemctl restart km-bridge')
 
 
-def make_token(cfg):
-    exp = str(int(time.time()) + TOKEN_DAYS * 86400)
-    sig = hmac.new(bytes.fromhex(cfg['secret']), exp.encode(), 'sha256').hexdigest()
-    return f'{exp}.{sig}'
+# 签名：登录状态和 Google 登录途中的暂存，都用服务器的密钥签名，别人改不了 -------------
+def sign(cfg, data):
+    body = base64.urlsafe_b64encode(json.dumps(data).encode()).decode().rstrip('=')
+    sig = hmac.new(bytes.fromhex(cfg['secret']), body.encode(), 'sha256').hexdigest()
+    return f'{body}.{sig}'
+
+
+def unsign(cfg, value):
+    try:
+        body, sig = str(value or '').rsplit('.', 1)
+        good = hmac.new(bytes.fromhex(cfg['secret']), body.encode(), 'sha256').hexdigest()
+        if not hmac.compare_digest(sig, good):
+            return None
+        data = json.loads(base64.urlsafe_b64decode(body + '=' * (-len(body) % 4)))
+        return data if data.get('exp', 0) > time.time() else None
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def make_token(cfg, email):
+    return sign(cfg, {'email': email, 'exp': int(time.time()) + TOKEN_DAYS * 86400})
 
 
 def check_token(cfg, token):
-    try:
-        exp, sig = str(token or '').split('.')
-        good = hmac.new(bytes.fromhex(cfg['secret']), exp.encode(), 'sha256').hexdigest()
-        return hmac.compare_digest(sig, good) and int(exp) > time.time()
-    except ValueError:
-        return False
-
-
-def locked():
-    now = time.time()
-    fails[:] = [t for t in fails if now - t < LOCK_MINUTES * 60]
-    return len(fails) >= LOCK_AFTER
-
-
-async def try_password(cfg, pw, who):
-    """密码对就回传 token，不对回传错误文字。"""
-    if locked():
-        return None, f'输错太多次，请 {LOCK_MINUTES} 分钟后再试。'
-    if hmac.compare_digest(hash_pw(str(pw or ''), cfg['salt']), cfg['hash']):
-        fails.clear()
-        log('登录成功', who)
-        return make_token(cfg), None
-    fails.append(time.time())
-    log('密码错误', who, f'{len(fails)}/{LOCK_AFTER}')
-    await asyncio.sleep(1)
-    return None, '密码不对。'
+    data = unsign(cfg, token)
+    return bool(data and data.get('email') in cfg['allowed'])
 
 
 def who_of(request):
     # 通过 tailscale funnel 进来的连接，真正的来源写在 X-Forwarded-For
     return request.headers.get('X-Forwarded-For') or request.remote
+
 
 
 # docker --------------------------------------------------------------------
@@ -254,6 +266,7 @@ class Term:
         self.close_fd()
 
 
+
 # WebSocket：真终端机 ---------------------------------------------------------
 def same_origin(request):
     origin = request.headers.get('Origin', '')
@@ -289,17 +302,10 @@ async def ws_handler(request):
                 continue
             t = m.get('t')
 
-            # 登录：网站上用 Cookie；file:// 打开的网页和检查工具用 token 或密码 --------
+            # 登录：网站上用 Cookie；检查工具用 km-bridge.py token 印出来的 token
             if not authed:
-                if t == 'auth' and (by_cookie or check_token(cfg, m.get('token'))):
-                    authed = True
-                    await send({'t': 'auth', 'ok': True})
-                elif t == 'login':
-                    token, err = await try_password(cfg, m.get('password'), who_of(request))
-                    authed = bool(token)
-                    await send({'t': 'auth', 'ok': authed, 'token': token, 'err': err})
-                else:
-                    await send({'t': 'auth', 'ok': False, 'err': '要先登录。'})
+                authed = t == 'auth' and (by_cookie or check_token(cfg, m.get('token')))
+                await send({'t': 'auth', 'ok': authed, 'err': None if authed else '要先登录。'})
                 continue
 
             if t == 'box':
@@ -344,7 +350,70 @@ async def ws_handler(request):
     return ws
 
 
-# 网站：登录页、登录、登出、网站文件 ------------------------------------------
+# 用 Google 登录（OpenID Connect，授权码流程 + PKCE）---------------------------
+def cookie_opts(max_age):
+    return {'max_age': max_age, 'httponly': True, 'secure': SECURE_COOKIE, 'samesite': 'Lax', 'path': '/'}
+
+
+def to_login(err=None):
+    raise web.HTTPFound('/login' + (f'?err={quote(err)}' if err else ''))
+
+
+async def google_start(request):
+    """第 1 步：带着随机的 state、nonce 和 PKCE，转去 Google 的登录页。"""
+    cfg = request.app['cfg']
+    verifier = secrets.token_urlsafe(48)
+    flow = {'state': secrets.token_urlsafe(24), 'nonce': secrets.token_urlsafe(24), 'verifier': verifier,
+            'next': request.query.get('next', '')[:200], 'exp': int(time.time()) + 600}
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('=')
+    query = urlencode({
+        'client_id': cfg['client_id'], 'redirect_uri': f"{cfg['public_url']}/auth/callback",
+        'response_type': 'code', 'scope': 'openid email', 'state': flow['state'], 'nonce': flow['nonce'],
+        'code_challenge': challenge, 'code_challenge_method': 'S256', 'prompt': 'select_account',
+    })
+    res = web.HTTPFound(f'{GOOGLE_AUTH}?{query}')
+    res.set_cookie(FLOW_COOKIE, sign(cfg, flow), **cookie_opts(600))
+    raise res
+
+
+async def google_callback(request):
+    """第 2 步：Google 转回来，拿授权码去换 ID token，检查是不是你本人。"""
+    cfg = request.app['cfg']
+    flow = unsign(cfg, request.cookies.get(FLOW_COOKIE))
+    q = request.query
+    if 'error' in q:
+        to_login('Google 登录取消了。')
+    if not flow or not hmac.compare_digest(str(q.get('state', '')), flow['state']):
+        to_login('登录过程过期或不完整，请再试一次。')
+    try:
+        async with ClientSession(timeout=ClientTimeout(total=15)) as http:
+            async with http.post(GOOGLE_TOKEN, data={
+                'code': q.get('code', ''), 'client_id': cfg['client_id'], 'client_secret': cfg['client_secret'],
+                'redirect_uri': f"{cfg['public_url']}/auth/callback", 'grant_type': 'authorization_code',
+                'code_verifier': flow['verifier'],
+            }) as r:
+                body = await r.json(content_type=None)
+        # ID token 是直接从 Google 的 HTTPS 接口拿到的，所以照 OpenID Connect 规范，可以靠 TLS 确认来源，不另外验签名
+        part = body['id_token'].split('.')[1]
+        claims = json.loads(base64.urlsafe_b64decode(part + '=' * (-len(part) % 4)))
+    except Exception as e:
+        log('Google 登录失败', who_of(request), repr(e)[:200])
+        to_login('跟 Google 换登录资料失败，请再试一次。')
+    email = str(claims.get('email', '')).lower()
+    ok = (claims.get('iss') in GOOGLE_ISSUERS and claims.get('aud') == cfg['client_id']
+          and claims.get('exp', 0) > time.time() and claims.get('nonce') == flow['nonce']
+          and claims.get('email_verified') is True and email in cfg['allowed'])
+    if not ok:
+        log('拒绝登录', who_of(request), email or '（没有邮箱）')
+        to_login(f'{email or "这个账号"} 不能登录这个网站。')
+    log('登录成功', who_of(request), email)
+    res = web.HTTPFound('/' + (flow['next'] if flow['next'].startswith('#') else ''))
+    res.set_cookie(COOKIE, make_token(cfg, email), **cookie_opts(TOKEN_DAYS * 86400))
+    res.del_cookie(FLOW_COOKIE, path='/')
+    raise res
+
+
+# 网站：登录页、登出、网站文件 ------------------------------------------------
 def authed(request):
     return check_token(request.app['cfg'], request.cookies.get(COOKIE))
 
@@ -353,19 +422,6 @@ async def login_page(request):
     if authed(request):
         raise web.HTTPFound('/')
     return web.FileResponse(LOGIN_PAGE, headers={'Cache-Control': 'no-store'})
-
-
-async def api_login(request):
-    try:
-        body = await request.json()
-    except ValueError:
-        body = {}
-    token, err = await try_password(request.app['cfg'], body.get('password'), who_of(request))
-    if not token:
-        return web.json_response({'ok': False, 'err': err}, status=401)
-    res = web.json_response({'ok': True})
-    res.set_cookie(COOKIE, token, max_age=TOKEN_DAYS * 86400, httponly=True, secure=SECURE_COOKIE, samesite='Lax', path='/')
-    return res
 
 
 async def api_logout(request):
@@ -398,10 +454,15 @@ async def site_file(request):
 
 @web.middleware
 async def safety_headers(request, handler):
-    res = await handler(request)
+    try:
+        res = await handler(request)
+    except web.HTTPException as e:
+        res = e
     res.headers.setdefault('X-Content-Type-Options', 'nosniff')
     res.headers.setdefault('X-Frame-Options', 'DENY')
     res.headers.setdefault('Referrer-Policy', 'same-origin')
+    if isinstance(res, web.HTTPException):
+        raise res
     return res
 
 
@@ -413,7 +474,8 @@ def make_app():
     app = web.Application(middlewares=[safety_headers], client_max_size=64 * 1024)
     app['cfg'] = load_config()
     app.router.add_get('/login', login_page)
-    app.router.add_post('/api/login', api_login)
+    app.router.add_get('/auth/google', google_start)
+    app.router.add_get('/auth/callback', google_callback)
     app.router.add_post('/api/logout', api_logout)
     app.router.add_get('/ws', ws_handler)
     app.router.add_get('/{path:.*}', site_file)
@@ -423,12 +485,22 @@ def make_app():
 
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else ''
-    if cmd == 'passwd':
-        set_password()
+    if cmd == 'setup':
+        setup()
+    elif cmd in ('serve', 'token', 'logout-all') and not os.path.exists(CONFIG):
+        sys.exit('还没设置：先运行 python3 km-bridge.py setup')
     elif cmd == 'serve':
-        if not os.path.exists(CONFIG):
-            sys.exit('还没设置密码：先运行 python3 km-bridge.py passwd')
-        log(f'服务启动：http://127.0.0.1:{PORT}，网站文件 {SITE}，镜像 {IMAGE}')
+        cfg = load_config()
+        log(f"服务启动：http://127.0.0.1:{PORT} → {cfg['public_url']}，网站文件 {SITE}，镜像 {IMAGE}")
+        log(f"可以登录的邮箱：{', '.join(cfg['allowed'])}")
         web.run_app(make_app(), host='127.0.0.1', port=PORT, print=None, access_log=None)
+    elif cmd == 'token':
+        cfg = load_config()
+        print(make_token(cfg, cfg['allowed'][0]))
+    elif cmd == 'logout-all':
+        cfg = load_config()
+        cfg['secret'] = secrets.token_hex(32)
+        save_config(cfg)
+        print('已经换掉签名密钥，所有设备都要重新登录。重启服务后生效：sudo systemctl restart km-bridge')
     else:
         print(__doc__)

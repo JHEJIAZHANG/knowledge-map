@@ -119,8 +119,7 @@
         body),
       h('p', { class: 'px-foot' }, KM.real && KM.real.served
         ? '补充：作答页右上角可以切换「模拟终端机」和「真终端机」。真终端机是服务器上真的 Ubuntu 22.04；模拟终端机只认得学过的命令，遇到不支持的写法会用黄字说明。'
-        : '补充：默认是模拟终端机，只认得学过的命令，输出照 LabEx 的格式写；遇到不支持的写法会用黄字说明。接上自己的服务器后，可以改用真的 Linux 作答。',
-        KM.real && !KM.real.served ? h('button', { class: 'rt-link', type: 'button', onclick: () => KM.real.dialog() }, KM.real.configured() ? '真终端机设置' : '接上真终端机') : null),
+        : '补充：这里是模拟终端机，只认得学过的命令，输出照 LabEx 的格式写；遇到不支持的写法会用黄字说明。在服务器上的网站打开，可以改用真的 Linux 作答。'),
     ];
   }
 
@@ -400,8 +399,7 @@
       onTyped: () => mark(p, { tried: true }),
     };
     async function goReal() {
-      if (!KM.real) return;
-      if (!KM.real.configured()) { await KM.real.dialog(); if (!KM.real.configured() || !alive) return; }
+      if (!KM.real || !KM.real.served) return;
       KM.real.setWanted(true);
       mode = 'real';
       term.classList.add('real');
@@ -436,7 +434,7 @@
     paintMode();
 
     const term = h('section', { class: 'sx-term' },
-      h('header', { class: 'sx-bar' }, h('i'), h('i'), h('i'), barTitle, KM.real ? modeBtn : null, reset),
+      h('header', { class: 'sx-bar' }, h('i'), h('i'), h('i'), barTitle, KM.real && KM.real.served ? modeBtn : null, reset),
       scroller,
       editor.el);
     const main = h('div', { class: 'px-main' },

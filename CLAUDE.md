@@ -41,12 +41,12 @@
 
 ## 网站服务器和真终端机（2026-11-19 添加）
 
-- 网站放在用户的 Oracle 服务器上，由 `server/km-bridge.py` 提供，**整个网站都要先登录**。对外用 Tailscale Funnel 公开，部署方式写在 `server/README.md`。
-- 用 `file://` 在本机打开照样要能用，不用登录。服务器送出的 `index.html` 会多一个 `<meta name="km-served">`，网页靠它判断是不是在服务器上。
+- 网站放在用户的 Oracle 服务器上，由 `server/km-bridge.py` 提供，**整个网站都要先用 Google 账号登录**。后端只放行设置里的 Gmail，两步验证（Authenticator）由 Google 负责。对外用 Tailscale Funnel 公开，部署方式写在 `server/README.md`。
+- 用 `file://` 在本机打开照样要能用，不用登录，但只有模拟终端机。服务器送出的 `index.html` 会多一个 `<meta name="km-served">`，网页靠它判断是不是在服务器上。
 - 作答页可以从模拟终端机切换成真的 Linux（服务器上的 Docker 容器）。网页这一边是 `js/real.js`，xterm.js 只在要用时才从 jsdelivr 加载。在服务器上打开时，真终端机共用网站的登录。
 - 题目的起始状态由 `setupScript` 照模拟终端机算出来，在容器里用 root 建好。判题时先拍容器的快照，再用同一个 `judge`，所以题目不用另外写。
 - 容器读不到真的开机日志，`dmesg` 换成练习用的日志，这件事要在画面上说明。
-- 加了新题后，如果服务器连得上，用 `KM_PW=密码 node tools/real-check.js wss://服务器网址/ws` 在真的容器里逐题跑一次。
+- 加了新题后，如果服务器连得上，用 `KM_TOKEN=token node tools/real-check.js wss://服务器网址/ws` 在真的容器里逐题跑一次。token 由用户在服务器上用 `km-bridge.py token` 产生。
 - 更新网站时，提醒用户用 `rsync` 同步到服务器（命令在 `server/README.md`）。
 - 服务器上的操作由用户自己动手，好让他们学到东西。我负责解说，并写服务器和网页的代码，不自己 SSH 进去操作。
 
