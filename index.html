@@ -21,7 +21,9 @@
       add: function (c) { this.chapters.push(c); },
       topic: function (t) { this.topics.push(t); },
       extras: [],
-      deepen: function (id, d) { this.extras.push([id, d]); }
+      deepen: function (id, d) { this.extras.push([id, d]); },
+      problems: [],
+      problem: function (p) { this.problems.push(p); }
     };
   </script>
 </head>
@@ -38,6 +40,7 @@
   <script src="js/films-py.js"></script>
   <script src="js/py.js"></script>
   <script src="js/run.js"></script>
+  <script src="js/shell.js"></script>
 
   <!-- 内容格式见 content/topics.js。同一主题内，这里的顺序就是学习顺序。 -->
   <script src="content/topics.js"></script>
@@ -64,6 +67,8 @@
   <script src="content/shell/deepen.js"></script>
   <script src="content/python/2026-11-16-python-repl.js"></script>
   <script src="content/python/deepen.js"></script>
+  <!-- 练习场的题目：把学过的串起来，题号就是顺序 -->
+  <script src="content/practice/problems.js"></script>
 
   <script src="js/store.js"></script>
   <script src="js/calendar.js"></script>
@@ -71,6 +76,7 @@
   <script src="js/sidebar.js"></script>
   <script src="js/pages.js"></script>
   <script src="js/extras.js"></script>
+  <script src="js/practice.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

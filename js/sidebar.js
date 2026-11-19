@@ -118,6 +118,7 @@
 
   // 组装 ---------------------------------------------------------------------
   const homeLink = h('a', { class: 'side-item elastic', href: '#/', draggable: 'false', html: icon('home') }, h('span', {}, '首页'));
+  const practiceLink = h('a', { class: 'side-item elastic', href: '#/practice', draggable: 'false', html: icon('target') }, h('span', {}, '练习场'), h('small', { class: 'side-count' }));
   const memoLink = h('a', { class: 'side-item elastic', href: '#/memo', draggable: 'false', html: icon('bulb') }, h('span', {}, '口诀总表'));
   const cheatLink = h('a', { class: 'side-item elastic', href: '#/cheat', draggable: 'false', html: icon('terminal') }, h('span', {}, '命令速查'));
   const panel = h('aside', { class: 'sidebar glass lit', 'aria-label': '网站导览' },
@@ -130,6 +131,7 @@
       h('button', { class: 'side-item elastic', type: 'button', html: icon('search'), onclick: () => KM.search.open() },
         h('span', {}, '搜索'),
         h('kbd', {}, /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K')),
+      practiceLink,
       memoLink,
       cheatLink),
     tree,
@@ -175,6 +177,8 @@
   function update(page) {
     homeLink.classList.toggle('on', page.type === 'home');
     memoLink.classList.toggle('on', page.type === 'memo');
+    practiceLink.classList.toggle('on', page.type === 'practice' || page.type === 'problem');
+    if (KM.practice) practiceLink.querySelector('.side-count').textContent = `${KM.practice.solvedCount()}/${KM.practice.total()}`;
     cheatLink.classList.toggle('on', page.type === 'cheat');
     for (const g of groups.values()) g.link.classList.remove('on');
     for (const [c, a] of links) {

@@ -181,10 +181,23 @@
     // 课程目录：每个主题底下依分类分区，编号就是学习顺序
     const maps = [courseMap(lastChapter)];
 
+    // 练习场入口：通过几题、下一题是哪一题
+    const total = KM.practice.total();
+    const done = KM.practice.solvedCount();
+    const practice = total ? h('a', { class: 'px-banner lit elastic reveal', href: '#/practice', draggable: 'false' },
+      h('span', { class: 'px-banner-icon', html: icon('target') }),
+      h('span', { class: 'px-banner-body' },
+        h('small', {}, '练习场'),
+        h('b', {}, done ? `已通过 ${done} / ${total} 题` : `${total} 道题，把学过的串起来`),
+        h('span', {}, '在网页里的模拟终端机作答，按「提交」自动检查。')),
+      h('span', { class: 'px-banner-bar', style: `--p:${done / total}` }),
+      h('span', { class: 'path-go', html: icon('arrow') })) : null;
+
     return [
       hero,
       resume,
       ...maps,
+      practice,
       h('section', { class: 'home-sec home-log', id: 'home-log' },
         h('div', { class: 'home-head' }, homeTitle('calendarCheck', '学习记录')),
         h('div', { class: 'bento' }, cal, statCard()),
@@ -340,7 +353,7 @@
     progress.style.setProperty('--p', max > 0 ? Math.min(1, scrollY / max).toFixed(4) : '0');
   }
 
-  // 路由：#/　#/t/主题　#/c/文章　#/c/文章/小节 --------------------------------
+  // 路由：#/　#/t/主题　#/c/文章　#/c/文章/小节　#/practice　#/p/题目 --------------------------------
   function parse() {
     const hash = location.hash;
     let m = hash.match(/^#\/c\/([^/]+)(?:\/(.+))?$/);
@@ -353,6 +366,12 @@
       const topic = topics.find((t) => t.id === decodeURIComponent(m[1]));
       if (topic) return { type: 'topic', key: `t:${topic.id}`, topic };
     }
+    m = hash.match(/^#\/p\/([^/]+)$/);
+    if (m) {
+      const problem = KM.practice.find(decodeURIComponent(m[1]));
+      if (problem) return { type: 'problem', key: `p:${problem.id}`, problem };
+    }
+    if (hash === '#/practice') return { type: 'practice', key: 'practice' };
     if (hash === '#/memo') return { type: 'memo', key: 'memo' };
     if (hash === '#/cheat') return { type: 'cheat', key: 'cheat' };
     return { type: 'home', key: 'home' };
@@ -375,6 +394,8 @@
 
     const parts = page.type === 'chapter' ? renderChapter(page.chapter)
       : page.type === 'topic' ? renderTopic(page.topic)
+      : page.type === 'practice' ? KM.practice.list()
+      : page.type === 'problem' ? KM.practice.page(page.problem)
       : page.type === 'memo' ? KM.pages.memo()
       : page.type === 'cheat' ? KM.pages.cheat()
       : renderHome();

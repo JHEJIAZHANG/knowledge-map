@@ -28,13 +28,23 @@
 3. 在 `content/<主题>/deepen.js` 加 `KM.deepen('文章 id', {...})`：`story`、`poster`，以及用 `at` 加到各小节的 `oops`（翻车现场）、`behind`（幕后视角）、`alt`（换个写法，原本的写法照样保留）。
 4. 新命令补进 `js/anatomy.js` 的 `DOC`（Python 内置函数在 `PYDOC`）。
 5. 新的短片写在 `js/films.js`（Shell）或 `js/films-py.js`（Python）。
+6. 学到新东西时，看看能不能在练习场加一两题（见下面「练习场」）。
+
+## 练习场（2026-11-19 添加）
+
+- `#/practice` 题目列表，`#/p/题目 id` 作答页。题目在 `content/practice/problems.js`，格式写在文件开头；题号就是文件里的顺序。
+- 题目要把**学过的**东西串起来，不出还没学的命令。难度 `level` 1 简单、2 中等、3 困难。
+- 作答用 `js/shell.js` 的模拟终端机：互动照 zsh，脚本照 bash，Python 用 `js/py.js`。错误消息照 LabEx 的格式；只支持学过的命令，不支持的写法会印黄字说明。学到新命令时，要在 `CMDS` 补上。
+- 判题看最后的状态（文件、权限、用户、脚本输出、Python 变量），不看用了哪个命令，所以别种正确写法也会通过。
+- 每题的参考解答 `answer` 要能通过：`node tools/practice-check.js` 会逐题跑一次，网页打开练习场时也会在主控台检查。
+- 通过记录存在浏览器的 `km-practice`，每题的终端机状态存在 `km-sbx-题目 id`。
 
 ## 版面原则（2026-11-18 重构）
 
 - 文章只让主线占版面：说明、终端机、短片、逐步演示。
 - 补充内容默认收起：情境故事 `story` 收在文章开头，点开才展开；`oops`、`behind`、`alt` 收进每节最后的「补充・想多看一点」分段标签，一次只展开一张。
 - 小测验一次一题，下面有题号圆点和上一题、下一题。
-- 首页顺序：搜索、继续学习（上次看到的那篇和下一篇）、课程目录、学习记录（日历、统计、最近添加）。课程目录上面是主题分段标签，一次只显示一个主题；每个单元一张卡片，里面一行一篇，有编号和类型标签。
+- 首页顺序：搜索、继续学习（上次看到的那篇和下一篇）、课程目录、练习场入口、学习记录（日历、统计、最近添加）。课程目录上面是主题分段标签，一次只显示一个主题；每个单元一张卡片，里面一行一篇，有编号和类型标签。
 - **不用全站的大楼比喻**：用户觉得没帮助，已经拿掉大楼地图页、文章开头的楼层条、短片里的楼层门牌。分类直接用单元名称。每个概念自己的比喻照常用（机器人是 Shell，变量是挂在值上的名牌）。新单元只要在 `topics.js` 加 group。
 
 ## 检查方式
@@ -43,7 +53,8 @@
 - 把 `index.html css js content` 复制到暂存目录，用 `python3 -m http.server 8765 --bind 127.0.0.1` 开起来，在浏览器设成 1440×900：
   - 每篇、首页、`#/cheat`、`#/memo` 都没有横向跑版（`scrollWidth <= innerWidth`），
   - 短片文字没有超框或重叠：把 `tools/audit.js` 一起复制过去，在页面里 `eval(await (await fetch('audit.js')).text())` 后运行 `await auditFilms()`，它会逐镜头检查，结果应该是空数组，
-  - 主控台没有「仿真结果和实际输出不同」的警告。
+  - 主控台没有「仿真结果和实际输出不同」的警告，也没有「练习题的参考解答没有通过」，
+  - `node tools/practice-check.js` 全部打勾。
 
 - 看版面用 headless Chrome 截整页图比较可靠（内置浏览器的截图常常停在旧画面）：
   `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars --force-prefers-reduced-motion --user-data-dir=<暂存目录>/chrome --window-size=1440,3000 --virtual-time-budget=5000 --screenshot=<暂存目录>/home.png "http://127.0.0.1:8765/#/"`，加 `--force-dark-mode` 看深色。
