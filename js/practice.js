@@ -117,8 +117,10 @@
           h('div', { class: 'course-tabs', role: 'tablist' }, topicTabs)),
         h('div', { class: 'px-chips' }, levelChips),
         body),
-      h('p', { class: 'px-foot' }, '补充：默认是模拟终端机，只认得学过的命令，输出照 LabEx 的格式写；遇到不支持的写法会用黄字说明。接上自己的服务器后，可以改用真的 Linux 作答。',
-        KM.real ? h('button', { class: 'rt-link', type: 'button', onclick: () => KM.real.dialog() }, KM.real.configured() ? '真终端机设置' : '接上真终端机') : null),
+      h('p', { class: 'px-foot' }, KM.real && KM.real.served
+        ? '补充：作答页右上角可以切换「模拟终端机」和「真终端机」。真终端机是服务器上真的 Ubuntu 22.04；模拟终端机只认得学过的命令，遇到不支持的写法会用黄字说明。'
+        : '补充：默认是模拟终端机，只认得学过的命令，输出照 LabEx 的格式写；遇到不支持的写法会用黄字说明。接上自己的服务器后，可以改用真的 Linux 作答。',
+        KM.real && !KM.real.served ? h('button', { class: 'rt-link', type: 'button', onclick: () => KM.real.dialog() }, KM.real.configured() ? '真终端机设置' : '接上真终端机') : null),
     ];
   }
 

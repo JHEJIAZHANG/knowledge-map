@@ -1,6 +1,7 @@
 // 真终端机：连到服务器上的桥接服务（server/km-bridge.py），在真的 Ubuntu 22.04 容器里作答
 //
-// 设置存在 km-real（服务器网址、登录后的 token），km-real-on 记住要不要用真终端机。
+// 网站放在服务器上（km-bridge.py 送出来的，页面有 km-served 标记）时，直接连同一个网址的 /ws，共用网站的登录。
+// 用 file:// 打开时，要另外设置服务器网址和登录：存在 km-real（网址、token）。km-real-on 记住要不要用真终端机。
 // 每道题一台容器（km-p-题目 id）。第一次开的时候，照模拟终端机算出来的起始状态把文件、用户建好；
 // 判题时把容器里的文件、用户拍一张快照，变成模拟终端机的格式，再用同一套 judge 检查。
 (function () {
@@ -9,9 +10,10 @@
   const XTERM = 'https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0';
   const FIT = 'https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0';
 
+  const served = typeof document !== 'undefined' && Boolean(document.querySelector('meta[name="km-served"]'));
   const conf = () => memory.get('km-real', {});
   const setConf = (patch) => memory.set('km-real', { ...conf(), ...patch });
-  const configured = () => Boolean(conf().url);
+  const configured = () => served || Boolean(conf().url);
   const wanted = () => configured() && memory.get('km-real-on', true);
   const setWanted = (on) => memory.set('km-real-on', on);
 
@@ -57,9 +59,10 @@
         let ws;
         try { ws = new WebSocket(this.url); } catch (e) { bad(new Error('网址的格式不对')); return; }
         this.ws = ws;
-        const timer = setTimeout(() => { ws.close(); bad(new Error('连不上服务器（Tailscale 开着吗？）')); }, 8000);
+        const why = served ? '连不上服务器' : '连不上服务器（Tailscale 开着吗？）';
+        const timer = setTimeout(() => { ws.close(); bad(new Error(why)); }, 8000);
         ws.onopen = () => { clearTimeout(timer); ok(); };
-        ws.onerror = () => { clearTimeout(timer); bad(new Error('连不上服务器（Tailscale 开着吗？）')); };
+        ws.onerror = () => { clearTimeout(timer); bad(new Error(why)); };
         ws.onclose = () => {
           this.closed = true;
           this.waiters.splice(0).forEach((w) => w.bad(new Error('连接中断了')));
@@ -105,6 +108,15 @@
 
   // 登录：先用记住的 token，不行再问密码
   async function connect() {
+    if (served) {
+      const conn = new Conn(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+      await conn.open();
+      const r = await conn.ask({ t: 'auth' });
+      if (r.ok) return conn;
+      conn.close();
+      location.replace('/login');   // 登录过期了
+      throw new Error('登录过期了');
+    }
     const c = conf();
     const conn = new Conn(wsUrl(c.url));
     await conn.open();
@@ -147,8 +159,8 @@
         h('form', { class: 'rt-box card', onsubmit: submit },
           h('h2', { html: `${icon('lock')}<span>${o.need === 'password' ? '登录真终端机' : '设置真终端机'}</span>` }),
           h('p', { class: 'rt-say' }, o.need === 'password'
-            ? '输入你在服务器上用 km-bridge.py passwd 设置的密码。登录后这台设备会记住 30 天。'
-            : '填服务器在 Tailscale 里的网址（tailscale serve 印出来的那个），这台设备要开着 Tailscale 才连得到。'),
+            ? '输入你在服务器上用 km-bridge.py passwd 设置的密码（和网站的登录密码一样）。登录后这台设备会记住 30 天。'
+            : '用 file:// 打开网站时才需要设置：填服务器的网址加上 /ws，例如 https://instance-xxxx.tailxxxx.ts.net/ws。'),
           o.need === 'password' ? null : h('label', { class: 'rt-field' }, h('span', {}, '服务器网址'), url),
           h('label', { class: 'rt-field' }, h('span', {}, o.need === 'password' ? '密码' : '密码（可以先不填，用到时再问）'), pw),
           err,
@@ -418,5 +430,5 @@ print(json.dumps({'files': files, 'py': py}))
     };
   }
 
-  KM.real = { configured, wanted, setWanted, dialog, session, setupScript, conf, Conn, snapshot, judge, boxOf: (p) => `p-${p.id.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`.slice(0, 38) };
+  KM.real = { served, configured, wanted, setWanted, dialog, session, setupScript, conf, Conn, snapshot, judge, boxOf: (p) => `p-${p.id.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`.slice(0, 38) };
 })();

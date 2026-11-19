@@ -125,6 +125,11 @@
     h('div', { class: 'side-head' },
       h('a', { class: 'side-brand', href: '#/', draggable: 'false' }, '知识', h('span', { class: 'grad' }, '地图')),
       themeBtn,
+      // 网站放在服务器上（要登录）时才有：退出登录
+      document.querySelector('meta[name="km-served"]') ? h('button', {
+        class: 'round elastic', type: 'button', 'aria-label': '退出登录', title: '退出登录', html: icon('lock'),
+        onclick: () => fetch('/api/logout', { method: 'POST' }).finally(() => location.replace('/login')),
+      }) : null,
       h('button', { class: 'round elastic', type: 'button', 'aria-label': '收起侧边栏', html: icon('panel'), onclick: () => setOpen(false, true) })),
     h('nav', { class: 'side-nav' },
       homeLink,

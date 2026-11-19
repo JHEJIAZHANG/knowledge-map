@@ -1,5 +1,5 @@
 // 真终端机自我检查：在服务器的真容器里，逐题跑参考解答，再用 judge 检查
-// 用法：KM_PW='桥接服务的密码' node tools/real-check.js wss://服务器网址 [题目 id …]
+// 用法：KM_PW='网站的密码' node tools/real-check.js wss://服务器网址/ws [题目 id …]
 // 每题会先把容器重置，跑完再删掉，不会留下东西。
 const fs = require('fs');
 const vm = require('vm');
@@ -8,7 +8,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const url = process.argv[2];
 const only = process.argv.slice(3);
-if (!url || !process.env.KM_PW) { console.log('用法：KM_PW=密码 node tools/real-check.js wss://服务器网址 [题目 id …]'); process.exit(2); }
+if (!url || !process.env.KM_PW) { console.log('用法：KM_PW=密码 node tools/real-check.js wss://服务器网址/ws [题目 id …]'); process.exit(2); }
 const KM = { problems: [], problem(p) { this.problems.push(p); } };
 KM.ui = { h: () => ({}), icon: () => '', memory: { get: (k, d) => d, set() {} } };
 const ctx = { window: { KnowledgeMap: KM }, KnowledgeMap: KM, console, WebSocket, setTimeout, clearTimeout, btoa };

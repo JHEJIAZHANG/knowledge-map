@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""知识地图的真终端机桥接服务。
+"""知识地图的网站服务器 + 真终端机桥接服务。
 
-网页通过 WebSocket 连进来，先登录，然后：
+整个网站都要先登录：没登录只看得到登录页，登录后才送出文章、练习场这些文件。
+真终端机走同一个网址的 /ws（WebSocket），共用这次登录：
   box    确认这道题的容器在不在，不在就开一台（km-term 镜像）
   shell  在容器里开一个 zsh，网页打的字送进去，画面送回网页
   exec   在容器里跑一个命令，把输出回给网页（准备题目、判题用）
@@ -9,9 +10,10 @@
 
 用法：
   python3 km-bridge.py passwd     设置登录密码（第一次要先做）
-  python3 km-bridge.py serve      启动服务（只听 127.0.0.1，靠 tailscale serve 对外）
+  python3 km-bridge.py serve      启动服务（只听 127.0.0.1，靠 tailscale funnel 对外）
 
-只用 Python 内置模块和 websockets（sudo apt install python3-websockets）。
+用到 Python 内置模块和 aiohttp（sudo apt install python3-aiohttp）。
+网站文件放在 ~/km-site（用 rsync 从 Mac 同步过来），登录页是同一个文件夹里的 login.html。
 """
 import asyncio
 import codecs
@@ -29,11 +31,16 @@ import sys
 import termios
 import time
 
-import websockets
+from aiohttp import WSMsgType, web
 
+HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get('KM_PORT', '7681'))
 IMAGE = os.environ.get('KM_IMAGE', 'km-term')
 CONFIG = os.path.expanduser(os.environ.get('KM_CONFIG', '~/.config/km-bridge/config.json'))
+SITE = os.path.realpath(os.path.expanduser(os.environ.get('KM_SITE', '~/km-site')))
+LOGIN_PAGE = os.path.join(HERE, 'login.html')
+COOKIE = 'km_session'
+SECURE_COOKIE = os.environ.get('KM_INSECURE') != '1'   # 本机测试（http）才关掉
 MAX_BOXES = 8            # 最多同时留几台容器，超过就删最久没用的
 IDLE_HOURS = 24          # 多久没用就自动删掉
 TOKEN_DAYS = 30          # 登录后记住几天
@@ -68,9 +75,9 @@ def hash_pw(pw, salt):
 
 
 def set_password():
-    pw = getpass.getpass('新密码（至少 10 个字）：')
-    if len(pw) < 10:
-        sys.exit('太短了，至少 10 个字。')
+    pw = getpass.getpass('新密码（至少 12 个字）：')
+    if len(pw) < 12:
+        sys.exit('太短了，至少 12 个字。网站会公开到互联网，密码要够长。')
     if getpass.getpass('再输入一次：') != pw:
         sys.exit('两次不一样，没有保存。')
     salt = secrets.token_hex(16)
@@ -79,7 +86,8 @@ def set_password():
     fd = os.open(CONFIG, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, 'w') as f:
         json.dump(cfg, f)
-    print(f'已保存到 {CONFIG}（权限 600，只有你读得到）。以前登录过的设备都要重新登录。')
+    print(f'已保存到 {CONFIG}（权限 600，只有你读得到）。')
+    print('以前登录过的设备都要重新登录。服务已经在跑的话，要重启：sudo systemctl restart km-bridge')
 
 
 def make_token(cfg):
@@ -90,7 +98,7 @@ def make_token(cfg):
 
 def check_token(cfg, token):
     try:
-        exp, sig = str(token).split('.')
+        exp, sig = str(token or '').split('.')
         good = hmac.new(bytes.fromhex(cfg['secret']), exp.encode(), 'sha256').hexdigest()
         return hmac.compare_digest(sig, good) and int(exp) > time.time()
     except ValueError:
@@ -101,6 +109,25 @@ def locked():
     now = time.time()
     fails[:] = [t for t in fails if now - t < LOCK_MINUTES * 60]
     return len(fails) >= LOCK_AFTER
+
+
+async def try_password(cfg, pw, who):
+    """密码对就回传 token，不对回传错误文字。"""
+    if locked():
+        return None, f'输错太多次，请 {LOCK_MINUTES} 分钟后再试。'
+    if hmac.compare_digest(hash_pw(str(pw or ''), cfg['salt']), cfg['hash']):
+        fails.clear()
+        log('登录成功', who)
+        return make_token(cfg), None
+    fails.append(time.time())
+    log('密码错误', who, f'{len(fails)}/{LOCK_AFTER}')
+    await asyncio.sleep(1)
+    return None, '密码不对。'
+
+
+def who_of(request):
+    # 通过 tailscale funnel 进来的连接，真正的来源写在 X-Forwarded-For
+    return request.headers.get('X-Forwarded-For') or request.remote
 
 
 # docker --------------------------------------------------------------------
@@ -174,8 +201,7 @@ class Term:
             '-e', 'TERM=xterm-256color', '-e', 'LANG=C.UTF-8', name, 'zsh',
             stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
         os.close(slave)
-        loop = asyncio.get_running_loop()
-        loop.add_reader(master, self.on_read)
+        asyncio.get_running_loop().add_reader(master, self.on_read)
         asyncio.ensure_future(self.watch(self.proc))
 
     def on_read(self):
@@ -228,54 +254,54 @@ class Term:
         self.close_fd()
 
 
-# 一条 WebSocket 连接 ---------------------------------------------------------
-async def handler(ws, *_):
-    cfg = load_config()
+# WebSocket：真终端机 ---------------------------------------------------------
+def same_origin(request):
+    origin = request.headers.get('Origin', '')
+    return origin.split('://', 1)[-1] == request.host
+
+
+async def ws_handler(request):
+    cfg = request.app['cfg']
+    ws = web.WebSocketResponse(heartbeat=20, max_msg_size=2 ** 20)
+    await ws.prepare(request)
+    # 从网站本身连进来：带着登录的 Cookie，而且来源是同一个网址（挡住别的网站借用你的登录）
+    by_cookie = same_origin(request) and check_token(cfg, request.cookies.get(COOKIE))
     authed = False
     box = None
     lock = asyncio.Lock()
 
     async def send(msg):
         async with lock:
-            try:
-                await ws.send(json.dumps(msg, ensure_ascii=False))
-            except websockets.ConnectionClosed:
-                pass
+            if not ws.closed:
+                try:
+                    await ws.send_str(json.dumps(msg, ensure_ascii=False))
+                except ConnectionError:
+                    pass
 
     term = Term(send)
     try:
-        async for raw in ws:
-            if not isinstance(raw, str) or len(raw) > 1_000_000:
+        async for msg in ws:
+            if msg.type != WSMsgType.TEXT:
                 continue
             try:
-                m = json.loads(raw)
+                m = json.loads(msg.data)
             except ValueError:
                 continue
             t = m.get('t')
 
-            # 登录 ------------------------------------------------------------
+            # 登录：网站上用 Cookie；file:// 打开的网页和检查工具用 token 或密码 --------
             if not authed:
-                if t == 'auth' and check_token(cfg, m.get('token')):
+                if t == 'auth' and (by_cookie or check_token(cfg, m.get('token'))):
                     authed = True
                     await send({'t': 'auth', 'ok': True})
                 elif t == 'login':
-                    if locked():
-                        await send({'t': 'auth', 'ok': False, 'err': f'输错太多次，请 {LOCK_MINUTES} 分钟后再试。'})
-                    elif hmac.compare_digest(hash_pw(str(m.get('password', '')), cfg['salt']), cfg['hash']):
-                        fails.clear()
-                        authed = True
-                        await send({'t': 'auth', 'ok': True, 'token': make_token(cfg)})
-                        log('登录成功', ws.remote_address)
-                    else:
-                        fails.append(time.time())
-                        log('密码错误', ws.remote_address, f'{len(fails)}/{LOCK_AFTER}')
-                        await asyncio.sleep(1)
-                        await send({'t': 'auth', 'ok': False, 'err': '密码不对。'})
+                    token, err = await try_password(cfg, m.get('password'), who_of(request))
+                    authed = bool(token)
+                    await send({'t': 'auth', 'ok': authed, 'token': token, 'err': err})
                 else:
                     await send({'t': 'auth', 'ok': False, 'err': '要先登录。'})
                 continue
 
-            # 登录之后 --------------------------------------------------------
             if t == 'box':
                 name = f"km-{m.get('box', '')}"
                 if not BOX_NAME.match(name[3:]):
@@ -315,14 +341,84 @@ async def handler(ws, *_):
                 await send({'t': 'reset'})
     finally:
         await term.stop()
+    return ws
 
 
-async def serve():
-    load_config()   # 还没设密码就直接报错
-    async with websockets.serve(handler, '127.0.0.1', PORT, max_size=2 ** 20, ping_interval=20):
-        log(f'桥接服务启动：ws://127.0.0.1:{PORT}，镜像 {IMAGE}')
-        asyncio.ensure_future(reaper())
-        await asyncio.Future()
+# 网站：登录页、登录、登出、网站文件 ------------------------------------------
+def authed(request):
+    return check_token(request.app['cfg'], request.cookies.get(COOKIE))
+
+
+async def login_page(request):
+    if authed(request):
+        raise web.HTTPFound('/')
+    return web.FileResponse(LOGIN_PAGE, headers={'Cache-Control': 'no-store'})
+
+
+async def api_login(request):
+    try:
+        body = await request.json()
+    except ValueError:
+        body = {}
+    token, err = await try_password(request.app['cfg'], body.get('password'), who_of(request))
+    if not token:
+        return web.json_response({'ok': False, 'err': err}, status=401)
+    res = web.json_response({'ok': True})
+    res.set_cookie(COOKIE, token, max_age=TOKEN_DAYS * 86400, httponly=True, secure=SECURE_COOKIE, samesite='Lax', path='/')
+    return res
+
+
+async def api_logout(request):
+    res = web.json_response({'ok': True})
+    res.del_cookie(COOKIE, path='/')
+    return res
+
+
+async def site_file(request):
+    if not authed(request):
+        raise web.HTTPFound('/login')
+    rel = request.match_info.get('path', '')
+    path = os.path.realpath(os.path.join(SITE, rel))
+    # 不能用 ../ 跑出网站文件夹；也不送隐藏文件（例如 .git）
+    if path != SITE and not path.startswith(SITE + os.sep):
+        raise web.HTTPNotFound()
+    if any(part.startswith('.') for part in rel.split('/')):
+        raise web.HTTPNotFound()
+    if os.path.isdir(path):
+        path = os.path.join(path, 'index.html')
+    if not os.path.isfile(path):
+        raise web.HTTPNotFound()
+    if path.endswith('index.html'):
+        # 告诉网页：这是服务器送出来的（真终端机直接用同一个网址和这次登录）
+        with open(path, encoding='utf-8') as f:
+            html = f.read().replace('<head>', '<head>\n  <meta name="km-served" content="1">', 1)
+        return web.Response(text=html, content_type='text/html', headers={'Cache-Control': 'no-cache'})
+    return web.FileResponse(path, headers={'Cache-Control': 'no-cache'})
+
+
+@web.middleware
+async def safety_headers(request, handler):
+    res = await handler(request)
+    res.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    res.headers.setdefault('X-Frame-Options', 'DENY')
+    res.headers.setdefault('Referrer-Policy', 'same-origin')
+    return res
+
+
+async def on_start(app):
+    app['reaper'] = asyncio.ensure_future(reaper())
+
+
+def make_app():
+    app = web.Application(middlewares=[safety_headers], client_max_size=64 * 1024)
+    app['cfg'] = load_config()
+    app.router.add_get('/login', login_page)
+    app.router.add_post('/api/login', api_login)
+    app.router.add_post('/api/logout', api_logout)
+    app.router.add_get('/ws', ws_handler)
+    app.router.add_get('/{path:.*}', site_file)
+    app.on_startup.append(on_start)
+    return app
 
 
 if __name__ == '__main__':
@@ -332,6 +428,7 @@ if __name__ == '__main__':
     elif cmd == 'serve':
         if not os.path.exists(CONFIG):
             sys.exit('还没设置密码：先运行 python3 km-bridge.py passwd')
-        asyncio.run(serve())
+        log(f'服务启动：http://127.0.0.1:{PORT}，网站文件 {SITE}，镜像 {IMAGE}')
+        web.run_app(make_app(), host='127.0.0.1', port=PORT, print=None, access_log=None)
     else:
         print(__doc__)
