@@ -2,7 +2,7 @@
 //
 // 只有网站放在服务器上（km-bridge.py 送出来的，页面有 km-served 标记）时才有：直接连同一个网址的 /ws，
 // 共用网站的 Google 登录。用 file:// 打开时只有模拟终端机。km-real-on 记住要不要用真终端机。
-// 每道题一台容器（km-p-题目 id）。第一次开的时候，照模拟终端机算出来的起始状态把文件、用户建好；
+// 每次打开题目都开一台全新的容器（km-p-题目 id），关掉网页就删掉。开好后照模拟终端机算出来的起始状态把文件、用户建好；
 // 判题时把容器里的文件、用户拍一张快照，变成模拟终端机的格式，再用同一套 judge 检查。
 (function () {
   const KM = window.KnowledgeMap;
@@ -320,6 +320,7 @@ print(json.dumps({'files': files, 'py': py}))
         ro.observe(el);
         fit.fit();
         dim('# 这是真的 Ubuntu 22.04（服务器上的容器），命令照 LabEx 的环境跑。做完按「提交」检查。');
+        dim('# 和 LabEx 一样：关掉或重新整理网页，这台容器就会删掉，下次打开是全新的。');
         if (JSON.stringify(p).includes('dmesg')) dim('# 补充：容器读不到服务器真正的开机日志，这里的 dmesg 印的是练习用的日志。');
         await start();
         term.focus();

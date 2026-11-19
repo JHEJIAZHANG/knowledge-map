@@ -43,7 +43,7 @@
 
 - 网站放在用户的 Oracle 服务器上，由 `server/km-bridge.py` 提供，**整个网站都要先用 Google 账号登录**。后端只放行设置里的 Gmail，两步验证（Authenticator）由 Google 负责。对外用 Tailscale Funnel 公开，部署方式写在 `server/README.md`。
 - 用 `file://` 在本机打开照样要能用，不用登录，但只有模拟终端机。服务器送出的 `index.html` 会多一个 `<meta name="km-served">`，网页靠它判断是不是在服务器上。
-- 作答页可以从模拟终端机切换成真的 Linux（服务器上的 Docker 容器）。网页这一边是 `js/real.js`，xterm.js 只在要用时才从 jsdelivr 加载。在服务器上打开时，真终端机共用网站的登录。
+- 作答页可以从模拟终端机切换成真的 Linux（服务器上的 Docker 容器）。和 LabEx 一样，每次打开题目都是全新的容器，关掉或重新整理网页就删掉。网页这一边是 `js/real.js`，xterm.js 只在要用时才从 jsdelivr 加载。在服务器上打开时，真终端机共用网站的登录。
 - 题目的起始状态由 `setupScript` 照模拟终端机算出来，在容器里用 root 建好。判题时先拍容器的快照，再用同一个 `judge`，所以题目不用另外写。
 - 容器读不到真的开机日志，`dmesg` 换成练习用的日志，这件事要在画面上说明。
 - 本机预览服务器版：`tools/local-test.sh`（假的 Google，允许 `me@example.com`；要开 OrbStack 和 `~/km-venv`）。改了 `server/` 或登录相关的东西后，用它走一遍登录和真终端机。

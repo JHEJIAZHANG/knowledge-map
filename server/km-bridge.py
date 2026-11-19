@@ -6,7 +6,7 @@
 Authenticator（两步验证）由 Google 负责：在你的 Google 账号打开两步验证就好。
 
 真终端机走同一个网址的 /ws（WebSocket），共用这次登录：
-  box    确认这道题的容器在不在，不在就开一台（km-term 镜像）
+  box    开一台这道题专用的全新容器（km-term 镜像）；连接一断（关掉网页、重新整理）就删掉
   shell  在容器里开一个 zsh，网页打的字送进去，画面送回网页
   exec   在容器里跑一个命令，把输出回给网页（准备题目、判题用）
   reset  把这道题的容器整台删掉
@@ -53,7 +53,7 @@ COOKIE = 'km_session'
 FLOW_COOKIE = 'km_oauth'
 LOCAL = re.compile(r'^http://(localhost|127\.0\.0\.1)(:\d+)?$')   # 本机预览可以用 http
 MAX_BOXES = 8            # 最多同时留几台容器，超过就删最久没用的
-IDLE_HOURS = 24          # 多久没用就自动删掉
+IDLE_HOURS = 3           # 保险：万一没删到，多久没用就自动删掉
 TOKEN_DAYS = 30          # 登录后记住几天
 BOX_NAME = re.compile(r'^[a-z0-9][a-z0-9-]{0,39}$')
 RUN_FLAGS = [
@@ -66,6 +66,8 @@ RUN_FLAGS = [
 ]
 
 used = {}        # 容器名称 → 最后使用时间
+owners = {}      # 容器名称 → 现在是哪一条连接在用（重新整理时，旧连接不能删掉新开的容器）
+locks = {}       # 容器名称 → 锁：同一台容器的开、删一次只做一件
 
 
 def log(*a):
@@ -162,14 +164,16 @@ async def box_list():
     return out.decode().split() if code == 0 else []
 
 
-async def ensure_box(name):
-    """容器在就直接用，不在就开一台。回传 True 代表是新开的。"""
-    used[name] = time.time()
-    code, out, _ = await docker('inspect', '-f', '{{.State.Running}}', name)
-    if code == 0:
-        if out.strip() != b'true':
-            await docker('start', name)
-        return False
+async def fresh_box(name, owner):
+    """像 LabEx 一样：每次打开题目都开一台全新的容器（旧的先删掉）。"""
+    async with locks.setdefault(name, asyncio.Lock()):
+        owners[name] = owner
+        used[name] = time.time()
+        await docker('rm', '-f', name)
+        await start_box(name)
+
+
+async def start_box(name):
     names = await box_list()
     if len(names) >= MAX_BOXES:
         names.sort(key=lambda n: used.get(n, 0))
@@ -181,7 +185,16 @@ async def ensure_box(name):
     if code != 0:
         raise RuntimeError(err.decode(errors='replace').strip())
     log('开了新容器', name)
-    return True
+
+
+async def drop_box(name, owner):
+    async with locks.setdefault(name, asyncio.Lock()):
+        if owners.get(name) is not owner:
+            return   # 已经有新的连接在用这台了
+        await docker('rm', '-f', name)
+        owners.pop(name, None)
+        used.pop(name, None)
+        log('删掉容器', name)
 
 
 async def reaper():
@@ -292,6 +305,7 @@ async def ws_handler(request):
                     pass
 
     term = Term(send)
+    me = object()   # 这条连接的身分
     try:
         async for msg in ws:
             if msg.type != WSMsgType.TEXT:
@@ -314,10 +328,12 @@ async def ws_handler(request):
                     await send({'t': 'error', 'err': '题目名称不对。'})
                     continue
                 await term.stop()
+                if box and box != name:
+                    await drop_box(box, me)
                 box = name
                 try:
-                    fresh = await ensure_box(box)
-                    await send({'t': 'box', 'fresh': fresh})
+                    await fresh_box(box, me)
+                    await send({'t': 'box', 'fresh': True})
                 except RuntimeError as e:
                     await send({'t': 'error', 'err': f'开不了容器：{e}'})
             elif not box:
@@ -341,12 +357,14 @@ async def ws_handler(request):
                             'out': out.decode(errors='replace'), 'err': err.decode(errors='replace')})
             elif t == 'reset':
                 await term.stop()
-                await docker('rm', '-f', box)
-                used.pop(box, None)
-                log('重置', box)
+                await drop_box(box, me)
+                box = None
                 await send({'t': 'reset'})
     finally:
+        # 关掉网页、重新整理、换到别题：这台容器就删掉，下次打开是全新的
         await term.stop()
+        if box:
+            await drop_box(box, me)
     return ws
 
 
@@ -469,6 +487,9 @@ async def safety_headers(request, handler):
 
 
 async def on_start(app):
+    # 服务重启时，上次留下的练习容器都清掉
+    for name in await box_list():
+        await docker('rm', '-f', name)
     app['reaper'] = asyncio.ensure_future(reaper())
 
 
